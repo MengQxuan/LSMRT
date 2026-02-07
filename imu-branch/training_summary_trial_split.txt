@@ -1,0 +1,205 @@
+训练命令:
+python train_imu_trial_split_cli.py --data_dir F:\study\LSMRT\data\multimodal-tactile-texture-dataset\processed_trial_split --use_cuda --batch 256 --epochs 30 --num_workers 0 --pin_memory
+
+数据集划分（按试验分割）:
+- 训练集窗口数: 625,643
+- 验证集窗口数: 134,060
+- 测试集窗口数: 134,063
+- 时间步长 T: 256
+- 通道数 C: 9
+- 类别数 num_classes: 12
+
+训练配置:
+- Batch size: 256
+- Epochs: 30
+- 使用 CUDA: 是
+- Num workers: 0
+- Pin memory: 启用
+
+警告信息:
+- 检测到 NumPy 数组不可写，转换为 PyTorch 张量时可能引发未定义行为（仅首次显示）
+
+训练过程摘要（每轮验证指标）:
+Epoch | Loss   | Val Acc | Val F1  | Time(s)
+------|--------|---------|---------|--------
+1     | 1.0166 | 0.7492  | 0.7512  | 142.8
+2     | 0.5533 | 0.8239  | 0.8235  | 90.3
+3     | 0.4156 | 0.8721  | 0.8730  | 90.1
+4     | 0.3396 | 0.8847  | 0.8854  | 89.5
+5     | 0.2884 | 0.9079  | 0.9079  | 89.4
+6     | 0.2526 | 0.9065  | 0.9068  | 89.9
+7     | 0.2250 | 0.9176  | 0.9176  | 90.4
+8     | 0.2020 | 0.9174  | 0.9175  | 90.5
+9     | 0.1845 | 0.9315  | 0.9315  | 90.1
+10    | 0.1681 | 0.9227  | 0.9227  | 90.0
+11    | 0.1558 | 0.9308  | 0.9309  | 90.5
+12    | 0.1448 | 0.9358  | 0.9360  | 90.6
+13    | 0.1362 | 0.9369  | 0.9370  | 91.0
+14    | 0.1274 | 0.9348  | 0.9347  | 86.2
+15    | 0.1190 | 0.9381  | 0.9380  | 86.3
+16    | 0.1118 | 0.9382  | 0.9383  | 86.2
+17    | 0.1064 | 0.9402  | 0.9402  | 86.8
+18    | 0.0999 | 0.9381  | 0.9380  | 86.1
+19    | 0.0950 | 0.9418  | 0.9419  | 85.9
+20    | 0.0907 | 0.9441  | 0.9441  | 86.2
+21    | 0.0865 | 0.9432  | 0.9431  | 86.2
+22    | 0.0836 | 0.9420  | 0.9420  | 86.5
+23    | 0.0796 | 0.9402  | 0.9403  | 87.0
+24    | 0.0766 | 0.9446  | 0.9446  | 86.5
+25    | 0.0737 | 0.9445  | 0.9446  | 85.9
+26    | 0.0707 | 0.9421  | 0.9421  | 86.1
+27    | 0.0677 | 0.9455  | 0.9456  | 86.4
+28    | 0.0657 | 0.9466  | 0.9467  | 86.4
+29    | 0.0628 | 0.9451  | 0.9451  | 86.4
+30    | 0.0609 | 0.9467  | 0.9467  | 86.1
+
+最终结果:
+- 最佳模型保存路径: runs/imu_trial_split_cnn/best.pt
+- 测试准确率 (test_acc): 0.9485
+- 宏平均 F1 分数 (macro_f1): 0.9486
+- 指标文件: runs/imu_trial_split_cnn/metrics.json
+
+
+
+
+训练命令:
+python train_imu_trial_split_cli.py --data_dir F:\study\LSMRT\data\multimodal-tactile-texture-dataset\processed_cross_velocity_30_35_to_40 --out_dir runs/imu_ood_vel4030_35 --use_cuda --batch 256 --epochs 30 --num_workers 0 --pin_memory --no_val
+
+数据集划分（跨速度域，OOD 设置）:
+- 训练集样本数: 650,081
+- 验证集样本数: 0（禁用验证）
+- 测试集样本数: 243,685
+- 时间步长 T: 256
+- 通道数 C: 9
+- 类别数 num_classes: 12
+
+训练配置:
+- Batch size: 256
+- Epochs: 30
+- 使用 CUDA: 是
+- Num workers: 0
+- Pin memory: 启用
+- 验证集: 禁用 (--no_val)
+
+训练过程摘要（仅训练损失）:
+Epoch | Loss   | Time(s)
+------|--------|--------
+1     | 1.5546 | 164.0
+2     | 1.3123 | 53.2
+3     | 1.2404 | 52.7
+4     | 1.1935 | 52.7
+5     | 1.1610 | 53.2
+6     | 1.1365 | 52.4
+7     | 1.1151 | 53.7
+8     | 1.0986 | 53.0
+9     | 1.0826 | 53.2
+10    | 1.0696 | 53.3
+11    | 1.0574 | 53.3
+12    | 1.0464 | 52.7
+13    | 1.0361 | 53.1
+14    | 1.0288 | 53.1
+15    | 1.0199 | 54.0
+16    | 1.0143 | 53.0
+17    | 1.0060 | 52.6
+18    | 1.0019 | 52.8
+19    | 0.9944 | 53.3
+20    | 0.9886 | 52.9
+21    | 0.9860 | 53.0
+22    | 0.9807 | 53.1
+23    | 0.9762 | 52.9
+24    | 0.9731 | 53.2
+25    | 0.9688 | 54.1
+26    | 0.9666 | 52.4
+27    | 0.9618 | 52.5
+28    | 0.9592 | 53.3
+29    | 0.9569 | 54.3
+30    | 0.9539 | 51.4
+
+最终测试结果（分布外泛化评估）:
+- 测试准确率 (test_acc): 0.2762
+- 宏平均 F1 分数 (macro_f1): 0.2587
+
+输出目录:
+- runs/imu_ood_vel4030_35/
+
+
+
+python train_imu_trial_split_cli.py \
+  --data_dir /root/mqx/LSMRT/data/multimodal-tactile-texture-dataset/processed_trial_split_30 \
+  --use_cuda --batch 256 --epochs 30 --num_workers 8 --pin_memory
+
+Train / Val / Test: 246675 52867 52839
+T: 256 C: 9 num_classes: 12
+[1] loss=1.5013 time=48.3s
+[2] loss=1.2123 time=38.5s
+[3] loss=1.1409 time=38.9s
+[4] loss=1.0949 time=39.6s
+[5] loss=1.0661 time=38.9s
+[6] loss=1.0409 time=41.6s
+[7] loss=1.0242 time=38.9s
+[8] loss=1.0049 time=25.4s
+[9] loss=0.9929 time=38.9s
+[10] loss=0.9787 time=39.0s
+[11] loss=0.9699 time=37.9s
+[12] loss=0.9580 time=40.7s
+[13] loss=0.9499 time=40.7s
+[14] loss=0.9396 time=39.2s
+[15] loss=0.9327 time=40.5s
+[16] loss=0.9256 time=39.1s
+[17] loss=0.9214 time=39.6s
+[18] loss=0.9162 time=39.7s
+[19] loss=0.9077 time=36.0s
+[20] loss=0.9040 time=31.4s
+[21] loss=0.8977 time=31.1s
+[22] loss=0.8930 time=35.6s
+[23] loss=0.8896 time=38.4s
+[24] loss=0.8839 time=39.4s
+[25] loss=0.8805 time=39.3s
+[26] loss=0.8772 time=39.2s
+[27] loss=0.8725 time=40.2s
+[28] loss=0.8677 time=38.6s
+[29] loss=0.8654 time=40.0s
+[30] loss=0.8618 time=39.9s
+=== DONE ===
+test_acc: 0.8893430988474422 macro_f1: 0.8937003652708168
+
+
+python train_imu_trial_split_cli.py \
+  --data_dir /root/mqx/LSMRT/data/multimodal-tactile-texture-dataset/processed_ood_vel30_to_40 \
+  --out_dir runs/imu_ood_vel30_to_40 \
+  --use_cuda --batch 256 --epochs 30 --num_workers 8 --pin_memory
+device: cuda
+Train / Val / Test: 299534 52847 243685
+T: 256 C: 9 num_classes: 12
+[1] loss=1.4630 time=56.1s
+[2] loss=1.1886 time=46.0s
+[3] loss=1.1176 time=52.4s
+[4] loss=1.0749 time=51.7s
+[5] loss=1.0469 time=51.5s
+[6] loss=1.0246 time=49.5s
+[7] loss=1.0031 time=48.7s
+[8] loss=0.9863 time=50.5s
+[9] loss=0.9753 time=49.3s
+[10] loss=0.9628 time=51.4s
+[11] loss=0.9528 time=50.0s
+[12] loss=0.9419 time=47.9s
+[13] loss=0.9350 time=51.1s
+[14] loss=0.9242 time=50.4s
+[15] loss=0.9199 time=50.3s
+[16] loss=0.9097 time=49.4s
+[17] loss=0.9052 time=50.6s
+[18] loss=0.8985 time=49.2s
+[19] loss=0.8930 time=50.2s
+[20] loss=0.8869 time=50.2s
+[21] loss=0.8831 time=51.8s
+[22] loss=0.8776 time=49.8s
+[23] loss=0.8744 time=49.6s
+[24] loss=0.8698 time=50.9s
+[25] loss=0.8676 time=51.7s
+[26] loss=0.8629 time=52.8s
+[27] loss=0.8578 time=51.8s
+[28] loss=0.8564 time=49.8s
+[29] loss=0.8540 time=50.7s
+[30] loss=0.8493 time=52.3s
+=== DONE ===
+test_acc: 0.19605228060816218 macro_f1: 0.16634059230802453

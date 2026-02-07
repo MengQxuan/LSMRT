@@ -1,0 +1,15 @@
+# datasets
+data/
+
+# training logs
+image-branch/runs/
+imu-branch/runs/
+
+# model / archives
+*.zip
+*.pth
+*.safetensors
+
+# python cache
+__pycache__/
+*.pyc

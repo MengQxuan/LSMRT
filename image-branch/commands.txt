@@ -1,0 +1,16 @@
+CUDA_VISIBLE_DEVICES=0 python train_minc_cli.py \
+  --minc_root /root/mqx/LSMRT/data/minc-2500 \
+  --split 1 \
+  --arch effb0 \
+  --img_size 224 \
+  --epochs 20 \
+  --batch 32 \
+  --lr 3e-4 \
+  --num_workers 8
+
+
+
+python bench_speed_cli.py \
+  --ckpt /root/mqx/LSMRT/image-branch/runs/effb0_s224_split1_resize/best.pt \
+  --img_size 224 \
+  --num_images 2000

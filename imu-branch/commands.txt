@@ -1,0 +1,4 @@
+python train_imu_trial_split_cli.py \
+  --data_dir /root/mqx/LSMRT/data/multimodal-tactile-texture-dataset/processed_trial_split_30 \
+  --use_cuda --batch 256 --epochs 30 --num_workers 8 --pin_memory
+  
