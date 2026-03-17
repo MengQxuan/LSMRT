@@ -1,0 +1,16 @@
+{
+  "num_images": 8,
+  "num_imu": 8,
+  "num_paired": 8,
+  "only_img": [],
+  "only_imu": [],
+  "label_count": {
+    "carton": 2,
+    "desk": 2,
+    "mousepad": 2,
+    "tile": 2
+  },
+  "imu_mode_count": {
+    "9-axis": 8
+  }
+}

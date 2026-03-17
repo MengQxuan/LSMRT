@@ -1,6 +1,6 @@
 # datasets
-data/
-
+data/minc-2500
+data/multimodal-tactile-texture-dataset
 # training logs
 image-branch/runs/
 imu-branch/runs/
