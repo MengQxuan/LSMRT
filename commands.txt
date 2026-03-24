@@ -1,0 +1,108 @@
+训练融合头
+CUDA_VISIBLE_DEVICES=0 python -u scripts/train_fusion_head.py \
+  --split_dir data/aligned-data/split_fusion_v1 \
+  --image_ckpt image-branch/runs/effb0_s224_split1_resize/best.pt \
+  --imu_ckpt imu-branch/runs/imu_trial_split_cnn/best.pt \
+  --out_dir runs/fusion_head_gpu0_seed42 \
+  --img_size 224 --imu_len 256 --val_ratio 0.2 \
+  --epochs 60 --batch 32 --lr 1e-3 --wd 1e-4 \
+  --dropout 0.3 --hidden_dim 512 --label_smoothing 0.05 \
+  --patience 12 --seed 42 --use_cuda
+
+CUDA_VISIBLE_DEVICES=1 python -u scripts/train_fusion_head.py \
+  --split_dir data/aligned-data/split_fusion_v1 \
+  --image_ckpt image-branch/runs/effb0_s224_split1_resize/best.pt \
+  --imu_ckpt imu-branch/runs/imu_trial_split_cnn/best.pt \
+  --out_dir runs/fusion_head_gpu1_seed43 \
+  --img_size 224 --imu_len 256 --val_ratio 0.2 \
+  --epochs 60 --batch 32 --lr 1e-3 --wd 1e-4 \
+  --dropout 0.3 --hidden_dim 512 --label_smoothing 0.05 \
+  --patience 12 --seed 43 --use_cuda
+
+python - <<'PY'
+import pandas as pd
+run_dir = "runs/fusion_head_gpu0_seed42"
+df = pd.read_csv(f"{run_dir}/test_predictions.csv")
+ok = df[df["label_true"] == df["label_pred"]].copy()
+bad = df[df["label_true"] != df["label_pred"]].copy()
+ok.to_csv(f"{run_dir}/test_correct.csv", index=False)
+bad.to_csv(f"{run_dir}/test_wrong.csv", index=False)
+print("total:", len(df), "correct:", len(ok), "wrong:", len(bad))
+print("saved:", f"{run_dir}/test_correct.csv", f"{run_dir}/test_wrong.csv")
+PY
+
+
+
+结果分析流程：
+source /root/miniconda3/etc/profile.d/conda.sh
+conda activate lsmrt_py311
+
+RUN_A='runs/fusion_head_gpu0_seed42_2' \
+RUN_B='runs/fusion_head_gpu1_seed43' \
+OUT='runs/error_analysis_latest' \
+python - <<'PY'
+import os
+from pathlib import Path
+import pandas as pd
+from collections import Counter
+
+run_a=Path(os.environ['RUN_A'])
+run_b=Path(os.environ['RUN_B'])
+out=Path(os.environ['OUT'])
+out.mkdir(parents=True,exist_ok=True)
+
+def load(run):
+    df=pd.read_csv(run/'test_predictions.csv')
+    df['ok']=df['label_true']==df['label_pred']
+    return df
+
+A=load(run_a)
+B=load(run_b)
+
+for tag,df in [('A',A),('B',B)]:
+    df[df.ok].to_csv(out/f'correct_{tag}.csv',index=False)
+    df[~df.ok].to_csv(out/f'wrong_{tag}.csv',index=False)
+
+    rows=[]
+    for lb,sub in df.groupby('label_true'):
+        rows.append({'run':tag,'label':lb,'n_test':len(sub),'acc':float(sub.ok.mean())})
+    pd.DataFrame(rows).sort_values(['acc','n_test','label']).to_csv(out/f'per_class_acc_{tag}.csv',index=False)
+
+    err=df[~df.ok].copy()
+    err['pair']=err['label_true']+'->'+err['label_pred']
+    top=Counter(err['pair']).most_common(30)
+    pd.DataFrame([{'run':tag,'pair':p,'count':c} for p,c in top]).to_csv(out/f'top_confusion_{tag}.csv',index=False)
+
+m=A[['sample_id','label_true','label_pred','confidence','image_path','imu_path']].rename(
+    columns={'label_pred':'pred_A','confidence':'conf_A'}
+).merge(
+    B[['sample_id','label_pred','confidence']].rename(columns={'label_pred':'pred_B','confidence':'conf_B'}),
+    on='sample_id',how='inner'
+)
+m['ok_A']=m['pred_A']==m['label_true']
+m['ok_B']=m['pred_B']==m['label_true']
+
+common_wrong=m[(~m.ok_A)&(~m.ok_B)].sort_values('sample_id')
+flip=m[m.ok_A!=m.ok_B].sort_values('sample_id')
+common_wrong.to_csv(out/'common_wrong_both_runs.csv',index=False)
+flip.to_csv(out/'flip_between_runs.csv',index=False)
+
+summary=pd.DataFrame([
+    {'run':'A','acc':float(A.ok.mean()),'n_test':len(A),'n_wrong':int((~A.ok).sum())},
+    {'run':'B','acc':float(B.ok.mean()),'n_test':len(B),'n_wrong':int((~B.ok).sum())},
+    {'run':'BOTH','acc':None,'n_test':len(m),'n_wrong':len(common_wrong)}
+])
+summary.to_csv(out/'summary.csv',index=False)
+print(summary.to_string(index=False))
+print("common_wrong:", ",".join(common_wrong['sample_id'].tolist()))
+PY
+
+cat runs/error_analysis_latest/summary.csv
+cat runs/error_analysis_latest/per_class_acc_A.csv
+cat runs/error_analysis_latest/per_class_acc_B.csv
+cat runs/error_analysis_latest/top_confusion_A.csv
+cat runs/error_analysis_latest/top_confusion_B.csv
+cat runs/error_analysis_latest/common_wrong_both_runs.csv
+
+
+

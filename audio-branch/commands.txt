@@ -1,0 +1,48 @@
+# 1) Activate conda env
+source /root/miniconda3/etc/profile.d/conda.sh
+conda activate lsmrt_py311
+
+# 2) Train audio branch with 2 GPUs (YCB proxy pretraining)
+cd /root/mqx/LSMRT/audio-branch
+CUDA_VISIBLE_DEVICES=0,1 torchrun --standalone --nproc_per_node=2 train_ycb_audio_branch_ddp.py \
+  --wav_root /root/mqx/LSMRT/data/YCB-impact-sounds/raw_audio/extracted/Audio \
+  --out_dir /root/mqx/LSMRT/audio-branch/runs \
+  --epochs 20 \
+  --batch 32 \
+  --num_workers 4 \
+  --clip_sec 1.0 \
+  --target_sr 24000 \
+  --train_clips_per_file 12 \
+  --eval_clips_per_file 4 \
+  --no_amp
+
+# 3) Quick smoke test (1 epoch)
+CUDA_VISIBLE_DEVICES=0,1 torchrun --standalone --nproc_per_node=2 train_ycb_audio_branch_ddp.py \
+  --wav_root /root/mqx/LSMRT/data/YCB-impact-sounds/raw_audio/extracted/Audio \
+  --out_dir /root/mqx/LSMRT/audio-branch/runs \
+  --epochs 1 \
+  --batch 8 \
+  --num_workers 2 \
+  --train_clips_per_file 4 \
+  --eval_clips_per_file 2
+
+# 4) Train Robot_impact_Data audio branch (recommended: horizontal materials, 10 classes)
+cd /root/mqx/LSMRT/audio-branch
+CUDA_VISIBLE_DEVICES=0,1 torchrun --standalone --nproc_per_node=2 train_robot_impact_audio_ddp.py \
+  --data_root /root/mqx/LSMRT/data/YCB-impact-sounds/Robot_impact_Data \
+  --subset horizontal \
+  --out_dir /root/mqx/LSMRT/audio-branch/runs \
+  --epochs 50 \
+  --batch 32 \
+  --num_workers 4 \
+  --clip_sec 1.0 \
+  --target_sr 24000
+
+# 5) Robot_impact_Data smoke test
+CUDA_VISIBLE_DEVICES=0,1 torchrun --standalone --nproc_per_node=2 train_robot_impact_audio_ddp.py \
+  --data_root /root/mqx/LSMRT/data/YCB-impact-sounds/Robot_impact_Data \
+  --subset horizontal \
+  --out_dir /root/mqx/LSMRT/audio-branch/runs \
+  --epochs 1 \
+  --batch 8 \
+  --num_workers 2

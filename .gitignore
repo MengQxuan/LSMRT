@@ -1,10 +1,9 @@
 # datasets
-data/minc-2500
-data/multimodal-tactile-texture-dataset
-data/aligned-data/
+data/
 # training logs
 image-branch/runs/
 imu-branch/runs/
+audio-branch/runs/
 runs/
 # model / archives
 *.zip
