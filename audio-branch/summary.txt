@@ -1,0 +1,65 @@
+实验结果总结（2026-03-25）
+
+一、实验目标
+- 在 Robot_impact_Data（horizontal 子集）上，验证音频分支改进是否能缓解“val 高、test 低”问题。
+- 主要对比：原始训练配置 vs 新增预训练迁移 + 类别权重 + 多裁剪评估。
+
+二、数据与任务设置
+- 数据集路径：/root/mqx/LSMRT/data/YCB-impact-sounds/Robot_impact_Data
+- 类别数：10（H_ 前缀材质类别）
+- 划分方式：train/val 来自 Horizontal_Pokes/train，test 来自 Horizontal_Pokes/test
+- 样本量：train=382, val=69, test=92（total=543）
+
+三、对比实验
+1) 基线实验（旧）
+- 目录：audio-branch/runs/horizontal_robot_impact_sr24000_clip1.0_b32x2_e50
+- 关键指标：
+  - best_val_acc = 0.9429
+  - test_acc = 0.4783
+  - test_loss = 1.8226
+
+2) 改进实验（新）
+- 目录：audio-branch/runs/horizontal_robot_impact_sr24000_clip1.0_b32x2_e50_pretrain_invSqrt_c5
+- 相比基线新增配置：
+  - pretrained_ckpt = ycb_proxy_sr24000_clip1.0_b32x2_e20/best.pt
+  - pretrained_scope = backbone_embedding
+  - class_weight_mode = inv_sqrt
+  - eval_num_crops = 5
+- 关键指标：
+  - best_val_acc = 0.9571
+  - test_acc = 0.6196
+  - test_loss = 1.7659
+  - test_macro_acc = 0.5900
+
+四、结果对比与结论
+- best_val_acc：0.9429 -> 0.9571（+1.43 个百分点）
+- test_acc：0.4783 -> 0.6196（+14.13 个百分点）
+- test_loss：1.8226 -> 1.7659（下降 0.0567）
+
+结论：
+- 改进策略显著提升了测试集泛化能力，说明迁移初始化与不平衡处理有效。
+- “val 高、test 低”问题仍未完全消失，但已明显缓解。
+
+五、新实验每类测试准确率（test_per_class_acc）
+- H_Aluminium: 0.30
+- H_Ceramic: 1.00
+- H_Foam: 0.50
+- H_Glass: 0.10
+- H_Hard_Plastic: 1.00
+- H_Other_Plastic: 0.00
+- H_Paper: 1.00
+- H_Soft_Plastic: 0.00
+- H_Steel: 1.00
+- H_Wood: 1.00
+
+观察：
+- 低表现类别集中在 H_Other_Plastic、H_Soft_Plastic、H_Glass，仍是后续重点难类。
+
+六、当前脚本能力更新
+- 训练脚本：audio-branch/train_robot_impact_audio_ddp.py
+- 已支持参数：
+  - 预训练迁移：--pretrained_ckpt, --pretrained_scope
+  - 类别权重：--class_weight_mode
+  - 多裁剪评估：--eval_num_crops
+  - 运行标记：--run_tag
+- 音频格式支持已扩展为：.ogg / .ogx / .wav / .flac
