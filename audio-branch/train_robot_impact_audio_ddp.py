@@ -1,9 +1,11 @@
 import argparse
 import json
+import math
 import os
 import random
 import re
 import time
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -58,6 +60,38 @@ def parse_args():
     p.add_argument("--label_smoothing", type=float, default=0.05)
     p.add_argument("--grad_clip", type=float, default=2.0)
     p.add_argument("--no_amp", action="store_true")
+    p.add_argument(
+        "--pretrained_ckpt",
+        type=str,
+        default="",
+        help="Optional checkpoint path for transfer learning (e.g., YCB proxy best.pt).",
+    )
+    p.add_argument(
+        "--pretrained_scope",
+        type=str,
+        default="backbone_embedding",
+        choices=["none", "backbone", "backbone_embedding", "all"],
+        help="Which parts to initialize from --pretrained_ckpt.",
+    )
+    p.add_argument(
+        "--class_weight_mode",
+        type=str,
+        default="inv_sqrt",
+        choices=["none", "inv_sqrt", "inv_freq"],
+        help="Class weight strategy for CrossEntropyLoss.",
+    )
+    p.add_argument(
+        "--eval_num_crops",
+        type=int,
+        default=1,
+        help="Evenly-spaced temporal crops per clip during val/test; logits are averaged.",
+    )
+    p.add_argument(
+        "--run_tag",
+        type=str,
+        default="",
+        help="Optional suffix appended to run folder name.",
+    )
     return p.parse_args()
 
 
@@ -101,6 +135,77 @@ def save_json(path: str, data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def build_class_weights(train_records, class_to_idx, mode: str):
+    if mode == "none":
+        return None, {}
+
+    counts = Counter([r.label_name for r in train_records])
+    w = torch.ones(len(class_to_idx), dtype=torch.float32)
+    for name, idx in class_to_idx.items():
+        c = float(max(1, counts.get(name, 0)))
+        if mode == "inv_freq":
+            w[idx] = 1.0 / c
+        elif mode == "inv_sqrt":
+            w[idx] = 1.0 / math.sqrt(c)
+        else:
+            raise ValueError(f"Unknown class_weight_mode={mode}")
+
+    w = w * (float(len(w)) / float(w.sum().clamp_min(1e-12).item()))
+    label_counts = {name: int(counts.get(name, 0)) for name in sorted(class_to_idx.keys())}
+    return w, label_counts
+
+
+def load_pretrained_weights(model: nn.Module, ckpt_path: str, scope: str, rank: int):
+    if (not ckpt_path) or scope == "none":
+        return
+
+    ckpt_p = Path(ckpt_path)
+    if not ckpt_p.exists():
+        raise FileNotFoundError(f"pretrained_ckpt not found: {ckpt_p}")
+
+    raw = torch.load(str(ckpt_p), map_location="cpu")
+    if isinstance(raw, dict) and "model" in raw:
+        src_state = raw["model"]
+    elif isinstance(raw, dict):
+        src_state = raw
+    else:
+        raise RuntimeError(f"Unsupported checkpoint format: {type(raw)}")
+
+    def allow_key(k: str):
+        if scope == "all":
+            return True
+        if scope == "backbone":
+            return k.startswith("mel.") or k.startswith("backbone.")
+        if scope == "backbone_embedding":
+            return (
+                k.startswith("mel.")
+                or k.startswith("backbone.")
+                or k.startswith("embedding.")
+            )
+        raise ValueError(f"Unknown pretrained_scope={scope}")
+
+    dst_state = model.state_dict()
+    filtered = {}
+    skipped_shape = []
+    for k, v in src_state.items():
+        if (k not in dst_state) or (not allow_key(k)):
+            continue
+        if dst_state[k].shape != v.shape:
+            skipped_shape.append(k)
+            continue
+        filtered[k] = v
+
+    missing, unexpected = model.load_state_dict(filtered, strict=False)
+    if is_main(rank):
+        print(
+            f"[pretrain] loaded={len(filtered)} "
+            f"skipped_shape={len(skipped_shape)} "
+            f"missing_after_load={len(missing)} unexpected={len(unexpected)} "
+            f"from={ckpt_p}",
+            flush=True,
+        )
+
+
 @dataclass
 class ClipRecord:
     path: str
@@ -127,7 +232,12 @@ def collect_vertical_records(root: Path):
         for object_dir in sorted([x for x in base.iterdir() if x.is_dir()]):
             mid = parse_material_id(object_dir.name)
             label_name = f"V{mid}"
-            clips = sorted(list(object_dir.glob("*.ogx")) + list(object_dir.glob("*.ogg")))
+            clips = sorted(
+                list(object_dir.glob("*.ogg"))
+                + list(object_dir.glob("*.ogx"))
+                + list(object_dir.glob("*.wav"))
+                + list(object_dir.glob("*.flac"))
+            )
             for c in clips:
                 recs.append(
                     ClipRecord(
@@ -155,7 +265,12 @@ def collect_horizontal_records(root: Path):
             if not split_root.exists():
                 continue
             for object_dir in sorted([x for x in split_root.iterdir() if x.is_dir()]):
-                clips = sorted(list(object_dir.glob("*.ogg")) + list(object_dir.glob("*.ogx")))
+                clips = sorted(
+                    list(object_dir.glob("*.ogg"))
+                    + list(object_dir.glob("*.ogx"))
+                    + list(object_dir.glob("*.wav"))
+                    + list(object_dir.glob("*.flac"))
+                )
                 for c in clips:
                     recs.append(
                         ClipRecord(
@@ -182,7 +297,7 @@ def collect_robot_impact_records(data_root: str, subset: str):
 
     if len(recs) == 0:
         raise RuntimeError(
-            f"No .ogg/.ogx clips found under {data_root} for subset={subset}"
+            f"No audio clips (.ogg/.ogx/.wav/.flac) found under {data_root} for subset={subset}"
         )
     return recs
 
@@ -243,12 +358,21 @@ def build_splits(records, subset: str, val_ratio: float, seed: int):
 
 
 class RobotImpactDataset(Dataset):
-    def __init__(self, records, class_to_idx, target_sr: int, clip_sec: float, mode: str):
+    def __init__(
+        self,
+        records,
+        class_to_idx,
+        target_sr: int,
+        clip_sec: float,
+        mode: str,
+        eval_num_crops: int = 1,
+    ):
         self.records = records
         self.class_to_idx = class_to_idx
         self.target_sr = int(target_sr)
         self.clip_frames = int(round(float(clip_sec) * self.target_sr))
         self.mode = mode
+        self.eval_num_crops = max(1, int(eval_num_crops))
         self._sf = None
 
     def __len__(self):
@@ -260,7 +384,7 @@ class RobotImpactDataset(Dataset):
                 import soundfile as sf  # type: ignore
             except Exception as e:
                 raise RuntimeError(
-                    "soundfile is required to decode .ogg/.ogx in Robot_impact_Data. "
+                    "soundfile is required to decode .ogg/.ogx/.wav/.flac in Robot_impact_Data. "
                     "Please install it in lsmrt_py311."
                 ) from e
             self._sf = sf
@@ -287,14 +411,12 @@ class RobotImpactDataset(Dataset):
 
         if n < t:
             wav = F.pad(wav, (0, t - n))
-        elif n > t:
-            if self.mode == "train":
-                s = random.randint(0, n - t)
-            else:
-                s = (n - t) // 2
-            wav = wav[s : s + t]
+            n = wav.numel()
 
         if self.mode == "train":
+            if n > t:
+                s = random.randint(0, n - t)
+                wav = wav[s : s + t]
             gain_db = random.uniform(-6.0, 6.0)
             wav = wav * float(10.0 ** (gain_db / 20.0))
             if random.random() < 0.5:
@@ -306,7 +428,20 @@ class RobotImpactDataset(Dataset):
             if shift != 0:
                 wav = torch.roll(wav, shifts=shift, dims=0)
             wav = wav.clamp(-1.0, 1.0)
+            return wav, int(y)
 
+        if self.eval_num_crops <= 1:
+            if n > t:
+                s = (n - t) // 2
+                wav = wav[s : s + t]
+            return wav, int(y)
+
+        if n <= t:
+            crops = [wav[:t] for _ in range(self.eval_num_crops)]
+        else:
+            starts = np.linspace(0, n - t, num=self.eval_num_crops, dtype=np.int64).tolist()
+            crops = [wav[int(s) : int(s) + t] for s in starts]
+        wav = torch.stack(crops, dim=0)
         return wav, int(y)
 
 
@@ -343,32 +478,58 @@ class AudioBranchNet(nn.Module):
 
 
 @torch.no_grad()
-def evaluate(model, loader, device, amp_enabled: bool):
+def evaluate(model, loader, device, amp_enabled: bool, num_classes: int = 0):
     model.eval()
     loss_fn = nn.CrossEntropyLoss()
     total_loss = 0.0
     total_correct = 0.0
     total_num = 0.0
+    conf = None
+    if num_classes > 0:
+        conf = torch.zeros((num_classes, num_classes), dtype=torch.float64, device=device)
     for wav, y in loader:
         wav = wav.to(device, non_blocking=True)
         y = y.to(device, non_blocking=True)
+
+        if wav.ndim == 3:
+            bsz, num_crops, num_frames = wav.shape
+            wav_in = wav.reshape(bsz * num_crops, num_frames)
+        else:
+            bsz = y.size(0)
+            num_crops = 1
+            wav_in = wav
+
         with torch.autocast(
             device_type="cuda", dtype=torch.float16, enabled=(amp_enabled and device.type == "cuda")
         ):
-            logits, _ = model(wav)
+            logits, _ = model(wav_in)
+            if num_crops > 1:
+                logits = logits.reshape(bsz, num_crops, -1).mean(dim=1)
             loss = loss_fn(logits, y)
         pred = torch.argmax(logits, dim=1)
         total_loss += float(loss.item()) * y.size(0)
         total_correct += float((pred == y).sum().item())
         total_num += float(y.size(0))
+        if conf is not None:
+            idx = (y.to(torch.int64) * num_classes + pred.to(torch.int64)).view(-1)
+            bins = torch.bincount(idx, minlength=num_classes * num_classes).to(torch.float64)
+            conf += bins.reshape(num_classes, num_classes)
     total_loss = reduce_sum_scalar(total_loss, device)
     total_correct = reduce_sum_scalar(total_correct, device)
     total_num = reduce_sum_scalar(total_num, device)
-    return total_loss / max(1.0, total_num), total_correct / max(1.0, total_num)
+    if conf is not None and dist.is_available() and dist.is_initialized():
+        dist.all_reduce(conf, op=dist.ReduceOp.SUM)
+    loss_avg = total_loss / max(1.0, total_num)
+    acc_avg = total_correct / max(1.0, total_num)
+    if conf is None:
+        return loss_avg, acc_avg
+    return loss_avg, acc_avg, conf
 
 
 def main():
     args = parse_args()
+    if args.eval_num_crops < 1:
+        raise ValueError("--eval_num_crops must be >= 1")
     rank, world_size, local_rank = setup_ddp()
     seed_everything(args.seed + rank)
 
@@ -396,9 +557,30 @@ def main():
         )
     num_classes = len(class_to_idx)
 
-    train_ds = RobotImpactDataset(train_records, class_to_idx, args.target_sr, args.clip_sec, mode="train")
-    val_ds = RobotImpactDataset(val_records, class_to_idx, args.target_sr, args.clip_sec, mode="val")
-    test_ds = RobotImpactDataset(test_records, class_to_idx, args.target_sr, args.clip_sec, mode="test")
+    train_ds = RobotImpactDataset(
+        train_records,
+        class_to_idx,
+        args.target_sr,
+        args.clip_sec,
+        mode="train",
+        eval_num_crops=1,
+    )
+    val_ds = RobotImpactDataset(
+        val_records,
+        class_to_idx,
+        args.target_sr,
+        args.clip_sec,
+        mode="val",
+        eval_num_crops=args.eval_num_crops,
+    )
+    test_ds = RobotImpactDataset(
+        test_records,
+        class_to_idx,
+        args.target_sr,
+        args.clip_sec,
+        mode="test",
+        eval_num_crops=args.eval_num_crops,
+    )
 
     train_sampler = DistributedSampler(train_ds, num_replicas=world_size, rank=rank, shuffle=True, drop_last=False)
     val_sampler = DistributedSampler(val_ds, num_replicas=world_size, rank=rank, shuffle=False, drop_last=False)
@@ -424,10 +606,25 @@ def main():
         hop_length=args.hop_length,
         n_mels=args.n_mels,
     ).to(device)
+    load_pretrained_weights(
+        model=model,
+        ckpt_path=args.pretrained_ckpt,
+        scope=args.pretrained_scope,
+        rank=rank,
+    )
     if world_size > 1:
         model = DDP(model, device_ids=[local_rank], output_device=local_rank)
 
-    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
+    class_weights_cpu, label_counts = build_class_weights(
+        train_records=train_records, class_to_idx=class_to_idx, mode=args.class_weight_mode
+    )
+    if is_main(rank):
+        print(f"[split] label_counts={json.dumps(label_counts, ensure_ascii=False)}", flush=True)
+        if class_weights_cpu is not None:
+            w_map = {name: float(class_weights_cpu[idx].item()) for name, idx in class_to_idx.items()}
+            print(f"[loss] class_weights={json.dumps(w_map, ensure_ascii=False)}", flush=True)
+    class_weights = class_weights_cpu.to(device) if class_weights_cpu is not None else None
+    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing, weight=class_weights)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
@@ -436,6 +633,8 @@ def main():
 
     run_name = f"robot_impact_sr{args.target_sr}_clip{args.clip_sec}_b{args.batch}x{world_size}_e{args.epochs}"
     run_name = f"{args.subset}_{run_name}"
+    if args.run_tag:
+        run_name = f"{run_name}_{args.run_tag}"
     out_dir = Path(args.out_dir) / run_name
     if is_main(rank):
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -500,7 +699,9 @@ def main():
         sum_num = reduce_sum_scalar(epoch_num, device)
         train_loss = sum_loss / max(1.0, sum_num)
         train_acc = sum_corr / max(1.0, sum_num)
-        val_loss, val_acc = evaluate(model, val_loader, device, amp_enabled=amp_enabled)
+        val_loss, val_acc = evaluate(
+            model, val_loader, device, amp_enabled=amp_enabled, num_classes=0
+        )
         dt = time.time() - t0
 
         if is_main(rank):
@@ -559,13 +760,31 @@ def main():
         else:
             model.load_state_dict(state_dict)
 
-    test_loss, test_acc = evaluate(model, test_loader, device, amp_enabled=amp_enabled)
+    test_loss, test_acc, test_conf = evaluate(
+        model, test_loader, device, amp_enabled=amp_enabled, num_classes=num_classes
+    )
 
     if is_main(rank):
+        per_class_acc = {}
+        for i in range(num_classes):
+            label_name = idx_to_label[i]
+            row = test_conf[i]
+            row_sum = float(row.sum().item())
+            diag = float(row[i].item())
+            per_class_acc[label_name] = (diag / row_sum) if row_sum > 0 else None
+        valid_class_acc = [x for x in per_class_acc.values() if x is not None]
+        test_macro_acc = float(sum(valid_class_acc) / max(1, len(valid_class_acc)))
+
         metrics = {
             "best_val_acc": best_val,
             "test_loss": test_loss,
             "test_acc": test_acc,
+            "test_macro_acc": test_macro_acc,
+            "test_per_class_acc": per_class_acc,
+            "eval_num_crops": args.eval_num_crops,
+            "class_weight_mode": args.class_weight_mode,
+            "pretrained_ckpt": args.pretrained_ckpt,
+            "pretrained_scope": args.pretrained_scope,
             "split_note": split_note,
             "class_note": (
                 "horizontal labels are material names prefixed with H_; "
