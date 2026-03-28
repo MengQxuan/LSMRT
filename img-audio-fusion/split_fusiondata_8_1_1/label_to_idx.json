@@ -1,15 +1,13 @@
 {
   "aluminum": 0,
   "carton": 1,
-  "ceramic": 2,
-  "foam": 3,
-  "glass": 4,
-  "hardplastic": 5,
-  "paper": 6,
-  "rubber": 7,
-  "softplastic": 8,
-  "steel": 9,
-  "tile": 10,
-  "wood": 11,
-  "woodgrain": 12
+  "foam": 2,
+  "glass": 3,
+  "paper": 4,
+  "plastic": 5,
+  "rubber": 6,
+  "steel": 7,
+  "tile": 8,
+  "wood": 9,
+  "woodgrain": 10
 }

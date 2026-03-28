@@ -61,3 +61,27 @@
   - `metrics.json`
   - `test_predictions.csv`
   - `train.csv`, `val.csv`, `test.csv`（训练时实际使用）
+
+
+七、去除 ceramic 后训练结果（2026-03-28）
+- 数据说明：`data/fusiondata` 中 `ceramic` 类别已删除，并重建划分
+- 划分规模：num_classes=12，train/val/test=241/31/31
+- 训练目录：`img-audio-fusion/runs/fusion_head_no_ceramic_seed42`
+- 关键指标：
+  - best_epoch = 42
+  - best_val_acc = 0.8065
+  - best_val_macro_f1 = 0.8224
+  - test_acc = 0.8065
+  - test_macro_f1 = 0.8159
+- 测试集错分（6/31）：
+  - foam35（foam -> tile）
+  - hardplastic16（hardplastic -> softplastic）
+  - paper15（paper -> hardplastic）
+  - softplastic05（softplastic -> steel）
+  - steel03（steel -> hardplastic）
+  - steel11（steel -> softplastic）
+
+八、
+out_dir: /root/mqx/LSMRT/img-audio-fusion/runs/fusion_head_split811_seed43
+best_head: /root/mqx/LSMRT/img-audio-fusion/runs/fusion_head_split811_seed43/best_head.pt
+test_acc=0.8065, test_macro_f1=0.7917

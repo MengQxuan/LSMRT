@@ -1,12 +1,10 @@
 aluminum
 carton
-ceramic
 foam
 glass
-hardplastic
 paper
+plastic
 rubber
-softplastic
 steel
 tile
 wood

@@ -6,7 +6,6 @@ import copy
 import json
 import random
 import time
-from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -19,7 +18,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
-from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+from torch.utils.data import DataLoader, Dataset, TensorDataset
 from torchvision import transforms
 from torchvision.models import efficientnet_b0, resnet18
 
@@ -38,39 +37,25 @@ def resolve_path(p: str, root: Path) -> str:
     return str((root / pp).resolve())
 
 
-def center_crop_or_pad(wav: torch.Tensor, target_len: int) -> torch.Tensor:
-    n = int(wav.numel())
+def center_crop_or_pad_np(wav: np.ndarray, target_len: int) -> np.ndarray:
+    n = int(wav.shape[0])
     if n < target_len:
-        wav = F.pad(wav, (0, target_len - n))
-        return wav
+        out = np.zeros((target_len,), dtype=np.float32)
+        out[:n] = wav.astype(np.float32, copy=False)
+        return out
     if n == target_len:
-        return wav
+        return wav.astype(np.float32, copy=False)
     start = (n - target_len) // 2
-    return wav[start : start + target_len]
-
-
-def parse_label_list(s: str):
-    if not s:
-        return []
-    return [x.strip().lower() for x in s.split(",") if x.strip()]
-
-
-def unique_params(params):
-    out = []
-    seen = set()
-    for p in params:
-        if id(p) in seen:
-            continue
-        out.append(p)
-        seen.add(id(p))
-    return out
+    return wav[start : start + target_len].astype(np.float32, copy=False)
 
 
 class PairedImageAudioDataset(Dataset):
-    def __init__(self, df: pd.DataFrame, img_size: int, target_sr: int, clip_sec: float):
+    def __init__(self, df: pd.DataFrame, img_size: int, target_sr: int, clip_sec: float, cache_audio: bool = True):
         self.df = df.reset_index(drop=True)
         self.target_sr = int(target_sr)
         self.clip_frames = int(round(float(clip_sec) * float(self.target_sr)))
+        self.cache_audio = bool(cache_audio)
+        self.audio_cache = {}
         self._sf = None
 
         self.img_tf = transforms.Compose(
@@ -92,7 +77,21 @@ class PairedImageAudioDataset(Dataset):
                 raise RuntimeError("soundfile is required for reading .wav files.") from e
             self._sf = sf
 
-        wav, sr = self._sf.read(path, dtype="float32", always_2d=True)
+        with self._sf.SoundFile(path, mode="r") as f:
+            sr = int(f.samplerate)
+            total_frames = int(len(f))
+
+            src_need = int(round(self.clip_frames * float(sr) / float(self.target_sr)))
+            src_need = max(1, src_need + 2)
+
+            if total_frames > src_need:
+                start = (total_frames - src_need) // 2
+                f.seek(start)
+                wav = f.read(frames=src_need, dtype="float32", always_2d=True)
+            else:
+                f.seek(0)
+                wav = f.read(dtype="float32", always_2d=True)
+
         wav = wav.mean(axis=1)
         if sr != self.target_sr:
             wav = resample_poly(wav, up=self.target_sr, down=sr).astype(np.float32)
@@ -104,13 +103,20 @@ class PairedImageAudioDataset(Dataset):
         img = Image.open(row["image_path"]).convert("RGB")
         x_img = self.img_tf(img)
 
-        wav_np = self._load_audio(row["audio_path"])
+        audio_path = str(row["audio_path"])
+        if self.cache_audio and audio_path in self.audio_cache:
+            wav_np = self.audio_cache[audio_path]
+        else:
+            wav_raw = self._load_audio(audio_path)
+            wav_np = center_crop_or_pad_np(wav_raw, self.clip_frames)
+            if self.cache_audio:
+                self.audio_cache[audio_path] = wav_np
+
         wav = torch.from_numpy(wav_np).float()
-        wav = center_crop_or_pad(wav, self.clip_frames)
 
         y = int(row["label_id"])
         sid = row["sample_id"]
-        return x_img, wav, y, sid, int(idx)
+        return x_img, wav, y, sid
 
 
 class ImageEffB0Backbone(nn.Module):
@@ -174,11 +180,6 @@ class AudioBranchNet(nn.Module):
         emb = F.normalize(self.embedding(feat), dim=1)
         return emb
 
-    def forward(self, wav):
-        emb = self.forward_embedding(wav)
-        logits = self.classifier(emb)
-        return logits, emb
-
 
 class AudioBackboneFromCkpt(nn.Module):
     def __init__(
@@ -199,9 +200,7 @@ class AudioBackboneFromCkpt(nn.Module):
         num_classes = int(sd["classifier.weight"].shape[0])
         target_sr = int(target_sr_override or (ck.get("target_sr", 24000) if isinstance(ck, dict) else 24000))
         n_fft = int(n_fft_override or (ck.get("n_fft", 1024) if isinstance(ck, dict) else 1024))
-        hop_length = int(
-            hop_length_override or (ck.get("hop_length", 256) if isinstance(ck, dict) else 256)
-        )
+        hop_length = int(hop_length_override or (ck.get("hop_length", 256) if isinstance(ck, dict) else 256))
         n_mels = int(n_mels_override or (ck.get("n_mels", 128) if isinstance(ck, dict) else 128))
 
         self.model = AudioBranchNet(
@@ -232,22 +231,47 @@ class FusionHead(nn.Module):
         return self.net(x)
 
 
-class FusionModel(nn.Module):
-    def __init__(self, img_backbone: nn.Module, audio_backbone: nn.Module, num_classes: int, hidden_dim: int, dropout: float):
-        super().__init__()
-        self.img_backbone = img_backbone
-        self.audio_backbone = audio_backbone
-        self.in_dim = int(img_backbone.out_dim + audio_backbone.out_dim)
-        self.head = FusionHead(self.in_dim, num_classes=num_classes, hidden_dim=hidden_dim, dropout=dropout)
+@torch.no_grad()
+def extract_features(img_backbone: nn.Module, audio_backbone: nn.Module, loader: DataLoader, device: torch.device, desc: str):
+    img_backbone.eval()
+    audio_backbone.eval()
 
-    def forward(self, x_img, x_audio):
-        f_img = self.img_backbone(x_img)
-        f_audio = self.audio_backbone(x_audio)
+    xs, ys, sids = [], [], []
+    total_batches = len(loader)
+
+    for bi, (x_img, x_audio, y, sid) in enumerate(loader, start=1):
+        x_img = x_img.to(device, non_blocking=True)
+        x_audio = x_audio.to(device, non_blocking=True)
+
+        f_img = img_backbone(x_img)
+        f_audio = audio_backbone(x_audio)
+
         f_img = F.normalize(f_img, p=2, dim=1)
         f_audio = F.normalize(f_audio, p=2, dim=1)
+
         feat = torch.cat([f_img, f_audio], dim=1)
-        logits = self.head(feat)
-        return logits, feat
+        xs.append(feat.cpu())
+        ys.append(torch.as_tensor(y, dtype=torch.long))
+        sids.extend(list(sid))
+
+        if bi % 5 == 0 or bi == total_batches:
+            print(f"[extract:{desc}] batch {bi}/{total_batches}", flush=True)
+
+    X = torch.cat(xs, dim=0)
+    Y = torch.cat(ys, dim=0)
+    return X, Y, sids
+
+
+@torch.no_grad()
+def predict_logits(model: nn.Module, X: torch.Tensor, device: torch.device, batch: int = 512):
+    model.eval()
+    outs = []
+    n = X.shape[0]
+    for i in range(0, n, batch):
+        xb = X[i : i + batch].to(device)
+        logits = model(xb)
+        outs.append(logits.cpu())
+    return torch.cat(outs, dim=0)
 
 
 def eval_from_logits(y_true: np.ndarray, logits: torch.Tensor):
@@ -260,229 +284,57 @@ def eval_from_logits(y_true: np.ndarray, logits: torch.Tensor):
     return acc, f1, cm, pred, conf
 
 
-@torch.no_grad()
-def infer_loader(model: nn.Module, loader: DataLoader, device: torch.device):
-    model.eval()
-    logits_all, y_all, sid_all, idx_all = [], [], [], []
-    for x_img, x_audio, y, sid, idx in loader:
-        x_img = x_img.to(device, non_blocking=True)
-        x_audio = x_audio.to(device, non_blocking=True)
-        logits, _ = model(x_img, x_audio)
-        logits_all.append(logits.cpu())
-        y_all.append(torch.as_tensor(y, dtype=torch.long))
-        sid_all.extend(list(sid))
-        idx_all.append(torch.as_tensor(idx, dtype=torch.long))
-
-    logits = torch.cat(logits_all, dim=0)
-    y = torch.cat(y_all, dim=0)
-    idx = torch.cat(idx_all, dim=0)
-    return logits, y, sid_all, idx
-
-
-@torch.no_grad()
-def compute_sample_losses(model: nn.Module, loader: DataLoader, device: torch.device):
-    model.eval()
-    crit = nn.CrossEntropyLoss(reduction="none")
-    losses = np.zeros(len(loader.dataset), dtype=np.float32)
-
-    for x_img, x_audio, y, sid, idx in loader:
-        x_img = x_img.to(device, non_blocking=True)
-        x_audio = x_audio.to(device, non_blocking=True)
-        y = y.to(device, non_blocking=True)
-        logits, _ = model(x_img, x_audio)
-        loss = crit(logits, y)
-        losses[idx.numpy()] = loss.detach().cpu().numpy()
-
-    return losses
-
-
-def build_class_weights(
-    df_train: pd.DataFrame,
+def train_head(
+    X_train: torch.Tensor,
+    y_train: torch.Tensor,
+    X_val: torch.Tensor,
+    y_val: torch.Tensor,
     num_classes: int,
-    idx_to_label: dict,
-    mode: str,
-    focus_labels,
-    focus_boost: float,
-):
-    counts = np.zeros(num_classes, dtype=np.float64)
-    for y in df_train["label_id"].astype(int).tolist():
-        counts[int(y)] += 1.0
-
-    weights = np.ones(num_classes, dtype=np.float64)
-    if mode == "inv_sqrt":
-        weights = 1.0 / np.sqrt(np.maximum(counts, 1.0))
-    elif mode == "inv_freq":
-        weights = 1.0 / np.maximum(counts, 1.0)
-    elif mode == "none":
-        weights = np.ones(num_classes, dtype=np.float64)
-    else:
-        raise ValueError(f"Unknown class_weight_mode={mode}")
-
-    label_to_idx = {str(v).lower(): int(k) for k, v in idx_to_label.items()}
-    boosted = []
-    for lb in focus_labels:
-        if lb in label_to_idx:
-            yi = label_to_idx[lb]
-            weights[yi] *= float(focus_boost)
-            boosted.append(lb)
-
-    weights = weights * (float(len(weights)) / float(np.sum(weights)))
-    weight_tensor = torch.tensor(weights, dtype=torch.float32)
-
-    count_map = {idx_to_label[i]: int(counts[i]) for i in range(num_classes)}
-    weight_map = {idx_to_label[i]: float(weights[i]) for i in range(num_classes)}
-    return weight_tensor, count_map, weight_map, boosted
-
-
-def configure_trainable_layers(model_core: FusionModel, finetune_last: bool):
-    for p in model_core.parameters():
-        p.requires_grad = False
-
-    for p in model_core.head.parameters():
-        p.requires_grad = True
-
-    ft_params = []
-    if finetune_last:
-        # Image branch: last EfficientNet feature stage.
-        for p in model_core.img_backbone.features[-1].parameters():
-            p.requires_grad = True
-            ft_params.append(p)
-
-        # Audio branch: last ResNet stage + embedding layer.
-        for p in model_core.audio_backbone.model.backbone.layer4.parameters():
-            p.requires_grad = True
-            ft_params.append(p)
-        for p in model_core.audio_backbone.model.embedding.parameters():
-            p.requires_grad = True
-            ft_params.append(p)
-
-    head_params = [p for p in model_core.head.parameters() if p.requires_grad]
-    ft_params = [p for p in ft_params if p.requires_grad]
-
-    head_params = unique_params(head_params)
-    ft_params = unique_params(ft_params)
-
-    total_trainable = sum(p.numel() for p in model_core.parameters() if p.requires_grad)
-    return head_params, ft_params, total_trainable
-
-
-def train_model(
-    model: nn.Module,
-    model_core: FusionModel,
-    ds_train: PairedImageAudioDataset,
-    ds_val: PairedImageAudioDataset,
-    df_train: pd.DataFrame,
-    num_classes: int,
-    class_weights: torch.Tensor,
-    head_params,
-    ft_params,
     args,
     device: torch.device,
-    use_cuda: bool,
 ):
-    pin_memory = bool(use_cuda)
-    persistent_workers = bool(args.num_workers > 0)
+    model = FusionHead(
+        in_dim=int(X_train.shape[1]),
+        num_classes=num_classes,
+        hidden_dim=args.hidden_dim,
+        dropout=args.dropout,
+    ).to(device)
 
-    dl_train_eval = DataLoader(
-        ds_train,
-        batch_size=args.batch,
-        shuffle=False,
-        num_workers=args.num_workers,
-        pin_memory=pin_memory,
-        persistent_workers=persistent_workers,
-    )
-    dl_val = DataLoader(
-        ds_val,
-        batch_size=args.batch,
-        shuffle=False,
-        num_workers=args.num_workers,
-        pin_memory=pin_memory,
-        persistent_workers=persistent_workers,
-    )
+    ds = TensorDataset(X_train, y_train)
+    loader = DataLoader(ds, batch_size=args.batch, shuffle=True, num_workers=0)
 
-    param_groups = [{"params": head_params, "lr": args.lr}]
-    if ft_params:
-        param_groups.append({"params": ft_params, "lr": args.lr_ft})
-
-    opt = torch.optim.AdamW(param_groups, weight_decay=args.wd)
-    crit = nn.CrossEntropyLoss(
-        weight=class_weights.to(device),
-        label_smoothing=args.label_smoothing,
-    )
-
-    label_ids = df_train["label_id"].astype(int).to_numpy()
-    class_w_np = class_weights.cpu().numpy()
-    hard_multipliers = np.ones(len(ds_train), dtype=np.float32)
-
-    use_amp = bool(args.amp and use_cuda)
-    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
+    opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.wd)
+    crit = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
 
     best = {"epoch": -1, "val_acc": -1.0, "val_f1": -1.0, "state": None}
     wait = 0
     history = []
 
     for ep in range(1, args.epochs + 1):
-        sample_weights = class_w_np[label_ids].astype(np.float32)
-        if args.hard_ratio > 0 and args.hard_boost > 1.0:
-            sample_weights = sample_weights * hard_multipliers
-
-        sampler = WeightedRandomSampler(
-            weights=torch.from_numpy(sample_weights).double(),
-            num_samples=len(sample_weights),
-            replacement=True,
-        )
-
-        dl_train = DataLoader(
-            ds_train,
-            batch_size=args.batch,
-            sampler=sampler,
-            num_workers=args.num_workers,
-            pin_memory=pin_memory,
-            persistent_workers=persistent_workers,
-        )
-
         model.train()
-        train_losses = []
+        losses = []
 
-        for x_img, x_audio, y, sid, idx in dl_train:
-            x_img = x_img.to(device, non_blocking=True)
-            x_audio = x_audio.to(device, non_blocking=True)
-            y = y.to(device, non_blocking=True)
+        for xb, yb in loader:
+            xb = xb.to(device)
+            yb = yb.to(device)
 
             opt.zero_grad(set_to_none=True)
-            with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=use_amp):
-                logits, _ = model(x_img, x_audio)
-                loss = crit(logits, y)
+            logits = model(xb)
+            loss = crit(logits, yb)
+            loss.backward()
+            opt.step()
 
-            scaler.scale(loss).backward()
-            if args.grad_clip > 0:
-                scaler.unscale_(opt)
-                nn.utils.clip_grad_norm_(model.parameters(), args.grad_clip)
-            scaler.step(opt)
-            scaler.update()
+            losses.append(float(loss.item()))
 
-            train_losses.append(float(loss.item()))
-
-        val_logits, val_y, _, _ = infer_loader(model, dl_val, device)
-        val_acc, val_f1, _, _, _ = eval_from_logits(val_y.numpy(), val_logits)
+        val_logits = predict_logits(model, X_val, device=device, batch=max(args.batch, 256))
+        val_acc, val_f1, _, _, _ = eval_from_logits(y_val.numpy(), val_logits)
 
         hist_row = {
             "epoch": ep,
-            "train_loss": float(np.mean(train_losses)) if train_losses else 0.0,
+            "train_loss": float(np.mean(losses)) if losses else 0.0,
             "val_acc": val_acc,
             "val_f1": val_f1,
         }
-
-        if args.hard_ratio > 0 and args.hard_boost > 1.0:
-            sample_losses = compute_sample_losses(model, dl_train_eval, device)
-            k = int(round(len(sample_losses) * args.hard_ratio))
-            k = max(1, min(len(sample_losses), k))
-            hard_idx = np.argpartition(sample_losses, -k)[-k:]
-            hard_multipliers[:] = 1.0
-            hard_multipliers[hard_idx] = float(args.hard_boost)
-            hist_row["hard_k"] = int(k)
-            hist_row["hard_loss_thr"] = float(np.min(sample_losses[hard_idx]))
-
         history.append(hist_row)
 
         improved = (val_f1 > best["val_f1"]) or (
@@ -493,15 +345,14 @@ def train_model(
             best["epoch"] = ep
             best["val_acc"] = val_acc
             best["val_f1"] = val_f1
-            core = model.module if isinstance(model, nn.DataParallel) else model
-            best["state"] = copy.deepcopy(core.state_dict())
+            best["state"] = copy.deepcopy(model.state_dict())
             wait = 0
         else:
             wait += 1
 
         print(
-            f"[{ep:03d}] loss={hist_row['train_loss']:.4f} val_acc={val_acc:.4f} "
-            f"val_f1={val_f1:.4f}",
+            f"[{ep:03d}] loss={hist_row['train_loss']:.4f} "
+            f"val_acc={val_acc:.4f} val_f1={val_f1:.4f}",
             flush=True,
         )
 
@@ -510,15 +361,14 @@ def train_model(
             break
 
     if best["state"] is None:
-        core = model.module if isinstance(model, nn.DataParallel) else model
-        best["state"] = copy.deepcopy(core.state_dict())
+        best["state"] = copy.deepcopy(model.state_dict())
 
-    model_core.load_state_dict(best["state"])
-    return best, history
+    model.load_state_dict(best["state"])
+    return model, best, history
 
 
 def parse_args():
-    p = argparse.ArgumentParser("Train image+audio fusion with weighted loss + hard oversampling + last-layer finetune")
+    p = argparse.ArgumentParser("Train image+audio fusion head with frozen branches (baseline)")
     p.add_argument("--split_dir", type=Path, default=Path("img-audio-fusion/split_fusiondata_8_1_1"))
     p.add_argument(
         "--image_ckpt",
@@ -542,28 +392,16 @@ def parse_args():
     p.add_argument("--n_mels", type=int, default=0, help="0 means reading from audio checkpoint")
 
     p.add_argument("--epochs", type=int, default=120)
-    p.add_argument("--batch", type=int, default=32)
-    p.add_argument("--lr", type=float, default=1e-3, help="Fusion head learning rate")
-    p.add_argument("--lr_ft", type=float, default=1e-5, help="Backbone last-layer finetune learning rate")
+    p.add_argument("--batch", type=int, default=64)
+    p.add_argument("--lr", type=float, default=1e-3)
     p.add_argument("--wd", type=float, default=1e-4)
     p.add_argument("--dropout", type=float, default=0.3)
     p.add_argument("--hidden_dim", type=int, default=512)
     p.add_argument("--label_smoothing", type=float, default=0.05)
     p.add_argument("--patience", type=int, default=20)
-    p.add_argument("--grad_clip", type=float, default=2.0)
-
-    p.add_argument("--class_weight_mode", type=str, default="inv_sqrt", choices=["none", "inv_sqrt", "inv_freq"])
-    p.add_argument("--focus_labels", type=str, default="ceramic,steel,woodgrain")
-    p.add_argument("--focus_boost", type=float, default=2.0)
-
-    p.add_argument("--hard_ratio", type=float, default=0.25)
-    p.add_argument("--hard_boost", type=float, default=3.0)
-
-    p.add_argument("--finetune_last", action="store_true")
 
     p.add_argument("--num_workers", type=int, default=4)
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--amp", action="store_true")
     p.add_argument("--use_cuda", action="store_true")
     p.add_argument("--use_data_parallel", action="store_true")
     return p.parse_args()
@@ -624,68 +462,31 @@ def main():
     num_gpu = torch.cuda.device_count() if use_cuda else 0
     use_dp = bool(args.use_data_parallel and use_cuda and num_gpu > 1)
 
-    focus_labels = parse_label_list(args.focus_labels)
-    class_weights, class_counts, class_weight_map, boosted_labels = build_class_weights(
-        df_train=df_train,
-        num_classes=num_classes,
-        idx_to_label=idx_to_label,
-        mode=args.class_weight_mode,
-        focus_labels=focus_labels,
-        focus_boost=args.focus_boost,
-    )
-
     print("split_dir:", split_dir, flush=True)
     print("train/val/test:", len(df_train), len(df_val), len(df_test), flush=True)
     print("num_classes:", num_classes, flush=True)
     print("device:", str(device), "num_gpu:", num_gpu, "use_data_parallel:", use_dp, flush=True)
-    print("class_weight_mode:", args.class_weight_mode, "focus_labels:", boosted_labels, "focus_boost:", args.focus_boost, flush=True)
-    print("hard_ratio:", args.hard_ratio, "hard_boost:", args.hard_boost, flush=True)
 
     ds_train = PairedImageAudioDataset(df_train, args.img_size, args.target_sr, args.clip_sec)
     ds_val = PairedImageAudioDataset(df_val, args.img_size, args.target_sr, args.clip_sec)
     ds_test = PairedImageAudioDataset(df_test, args.img_size, args.target_sr, args.clip_sec)
 
-    image_ckpt = str((root / args.image_ckpt).resolve())
-    audio_ckpt = str((root / args.audio_ckpt).resolve())
-
-    img_backbone = ImageEffB0Backbone(image_ckpt)
-    audio_backbone = AudioBackboneFromCkpt(
-        audio_ckpt,
-        target_sr_override=args.target_sr,
-        n_fft_override=args.n_fft,
-        hop_length_override=args.hop_length,
-        n_mels_override=args.n_mels,
+    dl_train = DataLoader(
+        ds_train,
+        batch_size=args.batch,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=use_cuda,
+        persistent_workers=(args.num_workers > 0),
     )
-
-    model_core = FusionModel(
-        img_backbone=img_backbone,
-        audio_backbone=audio_backbone,
-        num_classes=num_classes,
-        hidden_dim=args.hidden_dim,
-        dropout=args.dropout,
+    dl_val = DataLoader(
+        ds_val,
+        batch_size=args.batch,
+        shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=use_cuda,
+        persistent_workers=(args.num_workers > 0),
     )
-
-    head_params, ft_params, total_trainable = configure_trainable_layers(model_core, finetune_last=args.finetune_last)
-    print("finetune_last:", args.finetune_last, "trainable_params:", total_trainable, flush=True)
-
-    model_core = model_core.to(device)
-    model = nn.DataParallel(model_core) if use_dp else model_core
-
-    best, history = train_model(
-        model=model,
-        model_core=model_core,
-        ds_train=ds_train,
-        ds_val=ds_val,
-        df_train=df_train,
-        num_classes=num_classes,
-        class_weights=class_weights,
-        head_params=head_params,
-        ft_params=ft_params,
-        args=args,
-        device=device,
-        use_cuda=use_cuda,
-    )
-
     dl_test = DataLoader(
         ds_test,
         batch_size=args.batch,
@@ -695,14 +496,52 @@ def main():
         persistent_workers=(args.num_workers > 0),
     )
 
-    test_logits, y_test, sid_test, _ = infer_loader(model, dl_test, device)
+    image_ckpt = str((root / args.image_ckpt).resolve())
+    audio_ckpt = str((root / args.audio_ckpt).resolve())
+
+    img_backbone = ImageEffB0Backbone(image_ckpt).to(device)
+    audio_backbone = AudioBackboneFromCkpt(
+        audio_ckpt,
+        target_sr_override=args.target_sr,
+        n_fft_override=args.n_fft,
+        hop_length_override=args.hop_length,
+        n_mels_override=args.n_mels,
+    ).to(device)
+
+    if use_dp:
+        img_backbone = nn.DataParallel(img_backbone)
+        audio_backbone = nn.DataParallel(audio_backbone)
+
+    for p in img_backbone.parameters():
+        p.requires_grad = False
+    for p in audio_backbone.parameters():
+        p.requires_grad = False
+
+    X_train, y_train, sid_train = extract_features(img_backbone, audio_backbone, dl_train, device, desc="train")
+    X_val, y_val, sid_val = extract_features(img_backbone, audio_backbone, dl_val, device, desc="val")
+    X_test, y_test, sid_test = extract_features(img_backbone, audio_backbone, dl_test, device, desc="test")
+
+    print("feature_dim:", int(X_train.shape[1]), flush=True)
+    print("features train/val/test:", int(X_train.shape[0]), int(X_val.shape[0]), int(X_test.shape[0]), flush=True)
+
+    head, best, history = train_head(
+        X_train=X_train,
+        y_train=y_train,
+        X_val=X_val,
+        y_val=y_val,
+        num_classes=num_classes,
+        args=args,
+        device=device,
+    )
+
+    test_logits = predict_logits(head, X_test, device=device, batch=max(args.batch, 256))
     test_acc, test_f1, test_cm, test_pred, test_conf = eval_from_logits(y_test.numpy(), test_logits)
 
     best_path = out_dir / "best_head.pt"
     torch.save(
         {
-            "model": model_core.state_dict(),
-            "input_dim": int(model_core.in_dim),
+            "model": head.state_dict(),
+            "input_dim": int(X_train.shape[1]),
             "num_classes": num_classes,
             "hidden_dim": args.hidden_dim,
             "dropout": args.dropout,
@@ -714,8 +553,6 @@ def main():
             "n_fft": args.n_fft,
             "hop_length": args.hop_length,
             "n_mels": args.n_mels,
-            "finetune_last": bool(args.finetune_last),
-            "focus_labels": focus_labels,
         },
         best_path,
     )
@@ -754,7 +591,7 @@ def main():
         "num_train": int(len(df_train)),
         "num_val": int(len(df_val)),
         "num_test": int(len(df_test)),
-        "feature_dim": int(model_core.in_dim),
+        "feature_dim": int(X_train.shape[1]),
         "best_epoch": int(best["epoch"]),
         "best_val_acc": float(best["val_acc"]),
         "best_val_f1": float(best["val_f1"]),
@@ -766,21 +603,9 @@ def main():
             "train_vs_test_overlap": int(len(tr_ids & te_ids)),
             "val_vs_test_overlap": int(len(va_ids & te_ids)),
         },
-        "class_counts_train": class_counts,
-        "class_weights": class_weight_map,
-        "class_weight_mode": args.class_weight_mode,
-        "focus_labels": focus_labels,
-        "focus_labels_effective": boosted_labels,
-        "focus_boost": float(args.focus_boost),
-        "hard_ratio": float(args.hard_ratio),
-        "hard_boost": float(args.hard_boost),
-        "finetune_last": bool(args.finetune_last),
-        "lr_head": float(args.lr),
-        "lr_finetune": float(args.lr_ft),
         "history": history,
         "elapsed_sec": float(time.time() - t0),
     }
-
     with open(out_dir / "metrics.json", "w", encoding="utf-8") as f:
         json.dump(metrics, f, ensure_ascii=False, indent=2)
 
