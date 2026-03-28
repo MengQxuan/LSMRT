@@ -1,0 +1,63 @@
+项目：基于图像+接触声的融合头训练（img-audio-fusion）
+日期：2026-03-28
+
+一、数据与划分
+- 输入目录：
+  - 图像原始：`data/fusiondata/img`（HEIC）
+  - 图像训练读取：`data/fusiondata/img_jpg`（与音频同名，一一对应）
+  - 音频：`data/fusiondata/audio`
+- 对齐配对样本数：325
+- 类别数：13
+- 按类别分层划分（8:1:1）结果：
+  - train: 259
+  - val: 33
+  - test: 33
+- 泄漏检查：train/val/test 样本ID交集均为 0
+
+二、生成文件
+- 划分与标签目录：`img-audio-fusion/split_fusiondata_8_1_1`
+- 已生成：
+  - `all_samples.csv`
+  - `train.csv`, `val.csv`, `test.csv`
+  - `labels.txt`
+  - `label_map.csv`
+  - `label_to_idx.json`
+  - `class_counts.csv`
+  - `split_summary.json`
+
+三、训练配置
+- 图像预训练模型：
+  - `/root/mqx/LSMRT/image-branch/runs/effb0_s224_split1_resize/best.pt`
+- 音频预训练模型：
+  - `/root/mqx/LSMRT/audio-branch/runs/horizontal_robot_impact_sr24000_clip1.0_b32x2_e50_pretrain_invSqrt_c5/best.pt`
+- 训练策略：冻结图像与音频分支，仅训练融合头（MLP）
+- 融合特征维度：1536（图像1280 + 音频256）
+- 训练设备：`cuda:0`，`num_gpu=2`，`DataParallel=True`
+- 训练超参：epochs=150, patience=25, batch=64, lr=1e-3, wd=1e-4, dropout=0.3, hidden_dim=512
+- 实际早停：epoch 65（best epoch 40）
+- 总训练耗时：约 585.86 秒（约 9.76 分钟）
+
+四、结果指标
+- 最佳验证集：
+  - val_acc = 0.8485
+  - val_macro_f1 = 0.8778
+- 测试集：
+  - test_acc = 0.7576
+  - test_macro_f1 = 0.7617
+
+五、测试集误差现象（33样本）
+- 明显混淆主要集中在：
+  - ceramic -> hardplastic / softplastic
+  - hardplastic -> ceramic / rubber
+  - steel -> hardplastic
+  - woodgrain -> steel
+  - 少量 foam -> steel
+- 其余类别（如 aluminum、carton、glass、paper、rubber、softplastic、tile、wood）识别较稳定。
+
+六、训练输出目录
+- `img-audio-fusion/runs/fusion_head_split811_seed42`
+- 关键文件：
+  - `best_head.pt`
+  - `metrics.json`
+  - `test_predictions.csv`
+  - `train.csv`, `val.csv`, `test.csv`（训练时实际使用）
