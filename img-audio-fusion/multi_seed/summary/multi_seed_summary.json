@@ -1,0 +1,1168 @@
+{
+  "time": {
+    "start_unix": 1774771350.1550283,
+    "elapsed_sec_total": 24044.353957414627
+  },
+  "config": {
+    "repo_root": "/root/mqx/LSMRT",
+    "split_seeds": [
+      42,
+      43,
+      44,
+      45,
+      46
+    ],
+    "train_seeds": [
+      42,
+      43,
+      44
+    ],
+    "img_dir": "/root/mqx/LSMRT/data/fusiondata/img",
+    "audio_dir": "/root/mqx/LSMRT/data/fusiondata/audio",
+    "img_runtime_dir": "/root/mqx/LSMRT/data/fusiondata/img_jpg",
+    "image_ckpt": "/root/mqx/LSMRT/image-branch/runs/effb0_s224_split1_resize/best.pt",
+    "audio_ckpt": "/root/mqx/LSMRT/audio-branch/runs/horizontal_robot_impact_sr24000_clip1.0_b32x2_e50_pretrain_invSqrt_c5/best.pt",
+    "device": "cuda:0",
+    "num_gpu": 2,
+    "use_data_parallel": true,
+    "hyperparams": {
+      "img_size": 224,
+      "target_sr": 24000,
+      "clip_sec": 1.0,
+      "n_fft": 0,
+      "hop_length": 0,
+      "n_mels": 0,
+      "epochs": 150,
+      "batch": 64,
+      "lr": 0.001,
+      "wd": 0.0001,
+      "dropout": 0.3,
+      "hidden_dim": 512,
+      "label_smoothing": 0.05,
+      "patience": 25,
+      "num_workers": 4
+    }
+  },
+  "single_run_aggregate": {
+    "test_acc": {
+      "mean": 0.8839506172839505,
+      "std": 0.08727218787751688,
+      "min": 0.7037037037037037,
+      "max": 1.0
+    },
+    "test_macro_f1": {
+      "mean": 0.8683003663003662,
+      "std": 0.09809715086560347,
+      "min": 0.6796336996336997,
+      "max": 1.0
+    },
+    "best_val_acc": {
+      "mean": 0.8938271604938273,
+      "std": 0.05021347075087955,
+      "min": 0.8148148148148148,
+      "max": 1.0
+    },
+    "best_val_f1": {
+      "mean": 0.9054749694749695,
+      "std": 0.04231383281107658,
+      "min": 0.8400000000000001,
+      "max": 1.0
+    },
+    "elapsed_sec": {
+      "mean": 1162.48685186704,
+      "std": 1234.8985358612044,
+      "min": 194.8916404247284,
+      "max": 4993.780627012253
+    }
+  },
+  "ensemble_aggregate": {
+    "test_acc": {
+      "mean": 0.8814814814814815,
+      "std": 0.08445743889623245,
+      "min": 0.7777777777777778,
+      "max": 1.0
+    },
+    "test_macro_f1": {
+      "mean": 0.8628571428571428,
+      "std": 0.0970067907948586,
+      "min": 0.7514285714285714,
+      "max": 1.0
+    }
+  },
+  "per_split": {
+    "42": {
+      "num_runs": 3,
+      "single_test_acc": {
+        "mean": 0.9259259259259259,
+        "std": 0.0,
+        "min": 0.9259259259259259,
+        "max": 0.9259259259259259
+      },
+      "single_test_macro_f1": {
+        "mean": 0.9123809523809525,
+        "std": 0.0,
+        "min": 0.9123809523809525,
+        "max": 0.9123809523809525
+      },
+      "single_best_val_acc": {
+        "mean": 0.8888888888888888,
+        "std": 0.0,
+        "min": 0.8888888888888888,
+        "max": 0.8888888888888888
+      },
+      "single_best_val_f1": {
+        "mean": 0.9093040293040294,
+        "std": 1.3597399555105182e-16,
+        "min": 0.9093040293040293,
+        "max": 0.9093040293040293
+      },
+      "ensemble_test_acc": 0.9259259259259259,
+      "ensemble_test_macro_f1": 0.9123809523809525,
+      "ensemble_predictions_csv": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/summary/ensemble_test_predictions_split42.csv"
+    },
+    "43": {
+      "num_runs": 3,
+      "single_test_acc": {
+        "mean": 0.7530864197530865,
+        "std": 0.042766686606638946,
+        "min": 0.7037037037037037,
+        "max": 0.7777777777777778
+      },
+      "single_test_macro_f1": {
+        "mean": 0.7349938949938951,
+        "std": 0.04924452174329866,
+        "min": 0.6796336996336997,
+        "max": 0.7739194139194139
+      },
+      "single_best_val_acc": {
+        "mean": 0.9135802469135802,
+        "std": 0.021383343303319504,
+        "min": 0.8888888888888888,
+        "max": 0.9259259259259259
+      },
+      "single_best_val_f1": {
+        "mean": 0.9238095238095237,
+        "std": 0.01484614977916179,
+        "min": 0.9066666666666666,
+        "max": 0.9323809523809523
+      },
+      "ensemble_test_acc": 0.7777777777777778,
+      "ensemble_test_macro_f1": 0.7514285714285714,
+      "ensemble_predictions_csv": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/summary/ensemble_test_predictions_split43.csv"
+    },
+    "44": {
+      "num_runs": 3,
+      "single_test_acc": {
+        "mean": 0.8888888888888888,
+        "std": 0.037037037037037035,
+        "min": 0.8518518518518519,
+        "max": 0.9259259259259259
+      },
+      "single_test_macro_f1": {
+        "mean": 0.8926984126984127,
+        "std": 0.04180814981290766,
+        "min": 0.849047619047619,
+        "max": 0.9323809523809523
+      },
+      "single_best_val_acc": {
+        "mean": 0.8148148148148148,
+        "std": 0.0,
+        "min": 0.8148148148148148,
+        "max": 0.8148148148148148
+      },
+      "single_best_val_f1": {
+        "mean": 0.8400000000000002,
+        "std": 1.3597399555105182e-16,
+        "min": 0.8400000000000001,
+        "max": 0.8400000000000001
+      },
+      "ensemble_test_acc": 0.8518518518518519,
+      "ensemble_test_macro_f1": 0.849047619047619,
+      "ensemble_predictions_csv": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/summary/ensemble_test_predictions_split44.csv"
+    },
+    "45": {
+      "num_runs": 3,
+      "single_test_acc": {
+        "mean": 0.8518518518518517,
+        "std": 1.3597399555105182e-16,
+        "min": 0.8518518518518519,
+        "max": 0.8518518518518519
+      },
+      "single_test_macro_f1": {
+        "mean": 0.8014285714285713,
+        "std": 1.3597399555105182e-16,
+        "min": 0.8014285714285714,
+        "max": 0.8014285714285714
+      },
+      "single_best_val_acc": {
+        "mean": 0.9506172839506174,
+        "std": 0.042766686606638946,
+        "min": 0.9259259259259259,
+        "max": 1.0
+      },
+      "single_best_val_f1": {
+        "mean": 0.9549206349206348,
+        "std": 0.039039875345203305,
+        "min": 0.9323809523809523,
+        "max": 1.0
+      },
+      "ensemble_test_acc": 0.8518518518518519,
+      "ensemble_test_macro_f1": 0.8014285714285714,
+      "ensemble_predictions_csv": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/summary/ensemble_test_predictions_split45.csv"
+    },
+    "46": {
+      "num_runs": 3,
+      "single_test_acc": {
+        "mean": 1.0,
+        "std": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "single_test_macro_f1": {
+        "mean": 1.0,
+        "std": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "single_best_val_acc": {
+        "mean": 0.9012345679012346,
+        "std": 0.021383343303319504,
+        "min": 0.8888888888888888,
+        "max": 0.9259259259259259
+      },
+      "single_best_val_f1": {
+        "mean": 0.8993406593406593,
+        "std": 0.010404993862318532,
+        "min": 0.8933333333333333,
+        "max": 0.9113553113553113
+      },
+      "ensemble_test_acc": 1.0,
+      "ensemble_test_macro_f1": 1.0,
+      "ensemble_predictions_csv": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/summary/ensemble_test_predictions_split46.csv"
+    }
+  },
+  "runs": [
+    {
+      "split_seed": 42,
+      "train_seed": 42,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train42",
+      "best_epoch": 64,
+      "best_val_acc": 0.8888888888888888,
+      "best_val_f1": 0.9093040293040293,
+      "test_acc": 0.9259259259259259,
+      "test_macro_f1": 0.9123809523809525,
+      "elapsed_sec": 1060.8471262454987
+    },
+    {
+      "split_seed": 42,
+      "train_seed": 43,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train43",
+      "best_epoch": 52,
+      "best_val_acc": 0.8888888888888888,
+      "best_val_f1": 0.9093040293040293,
+      "test_acc": 0.9259259259259259,
+      "test_macro_f1": 0.9123809523809525,
+      "elapsed_sec": 496.3102262020111
+    },
+    {
+      "split_seed": 42,
+      "train_seed": 44,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train44",
+      "best_epoch": 68,
+      "best_val_acc": 0.8888888888888888,
+      "best_val_f1": 0.9093040293040293,
+      "test_acc": 0.9259259259259259,
+      "test_macro_f1": 0.9123809523809525,
+      "elapsed_sec": 363.74995946884155
+    },
+    {
+      "split_seed": 43,
+      "train_seed": 42,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split43_train42",
+      "best_epoch": 13,
+      "best_val_acc": 0.9259259259259259,
+      "best_val_f1": 0.9323809523809523,
+      "test_acc": 0.7777777777777778,
+      "test_macro_f1": 0.7514285714285714,
+      "elapsed_sec": 337.2631552219391
+    },
+    {
+      "split_seed": 43,
+      "train_seed": 43,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split43_train43",
+      "best_epoch": 13,
+      "best_val_acc": 0.9259259259259259,
+      "best_val_f1": 0.9323809523809523,
+      "test_acc": 0.7777777777777778,
+      "test_macro_f1": 0.7739194139194139,
+      "elapsed_sec": 373.87590289115906
+    },
+    {
+      "split_seed": 43,
+      "train_seed": 44,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split43_train44",
+      "best_epoch": 10,
+      "best_val_acc": 0.8888888888888888,
+      "best_val_f1": 0.9066666666666666,
+      "test_acc": 0.7037037037037037,
+      "test_macro_f1": 0.6796336996336997,
+      "elapsed_sec": 920.60307264328
+    },
+    {
+      "split_seed": 44,
+      "train_seed": 42,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split44_train42",
+      "best_epoch": 13,
+      "best_val_acc": 0.8148148148148148,
+      "best_val_f1": 0.8400000000000001,
+      "test_acc": 0.8518518518518519,
+      "test_macro_f1": 0.849047619047619,
+      "elapsed_sec": 1354.1159837245941
+    },
+    {
+      "split_seed": 44,
+      "train_seed": 43,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split44_train43",
+      "best_epoch": 15,
+      "best_val_acc": 0.8148148148148148,
+      "best_val_f1": 0.8400000000000001,
+      "test_acc": 0.8888888888888888,
+      "test_macro_f1": 0.8966666666666667,
+      "elapsed_sec": 921.0488181114197
+    },
+    {
+      "split_seed": 44,
+      "train_seed": 44,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split44_train44",
+      "best_epoch": 16,
+      "best_val_acc": 0.8148148148148148,
+      "best_val_f1": 0.8400000000000001,
+      "test_acc": 0.9259259259259259,
+      "test_macro_f1": 0.9323809523809523,
+      "elapsed_sec": 456.7539758682251
+    },
+    {
+      "split_seed": 45,
+      "train_seed": 42,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split45_train42",
+      "best_epoch": 13,
+      "best_val_acc": 0.9259259259259259,
+      "best_val_f1": 0.9323809523809523,
+      "test_acc": 0.8518518518518519,
+      "test_macro_f1": 0.8014285714285714,
+      "elapsed_sec": 195.3036870956421
+    },
+    {
+      "split_seed": 45,
+      "train_seed": 43,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split45_train43",
+      "best_epoch": 37,
+      "best_val_acc": 1.0,
+      "best_val_f1": 1.0,
+      "test_acc": 0.8518518518518519,
+      "test_macro_f1": 0.8014285714285714,
+      "elapsed_sec": 4993.780627012253
+    },
+    {
+      "split_seed": 45,
+      "train_seed": 44,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split45_train44",
+      "best_epoch": 14,
+      "best_val_acc": 0.9259259259259259,
+      "best_val_f1": 0.9323809523809523,
+      "test_acc": 0.8518518518518519,
+      "test_macro_f1": 0.8014285714285714,
+      "elapsed_sec": 194.8916404247284
+    },
+    {
+      "split_seed": 46,
+      "train_seed": 42,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split46_train42",
+      "best_epoch": 32,
+      "best_val_acc": 0.8888888888888888,
+      "best_val_f1": 0.8933333333333333,
+      "test_acc": 1.0,
+      "test_macro_f1": 1.0,
+      "elapsed_sec": 2017.0018026828766
+    },
+    {
+      "split_seed": 46,
+      "train_seed": 43,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split46_train43",
+      "best_epoch": 58,
+      "best_val_acc": 0.9259259259259259,
+      "best_val_f1": 0.9113553113553113,
+      "test_acc": 1.0,
+      "test_macro_f1": 1.0,
+      "elapsed_sec": 1923.3669061660767
+    },
+    {
+      "split_seed": 46,
+      "train_seed": 44,
+      "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split46_train44",
+      "best_epoch": 30,
+      "best_val_acc": 0.8888888888888888,
+      "best_val_f1": 0.8933333333333333,
+      "test_acc": 1.0,
+      "test_macro_f1": 1.0,
+      "elapsed_sec": 1828.389894247055
+    }
+  ],
+  "ensemble_runs": [
+    {
+      "split_seed": 42,
+      "num_models": 3,
+      "num_test": 27,
+      "ensemble_test_acc": 0.9259259259259259,
+      "ensemble_test_macro_f1": 0.9123809523809525,
+      "ensemble_avg_confidence": 0.8448224663734436,
+      "ensemble_confusion_matrix": [
+        [
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          6,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2
+        ]
+      ],
+      "ensemble_predictions_csv": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/summary/ensemble_test_predictions_split42.csv",
+      "per_model_recomputed": [
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train42",
+          "test_acc_recomputed": 0.9259259259259259,
+          "test_macro_f1_recomputed": 0.9123809523809525,
+          "avg_confidence_recomputed": 0.84307861328125
+        },
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train43",
+          "test_acc_recomputed": 0.9259259259259259,
+          "test_macro_f1_recomputed": 0.9123809523809525,
+          "avg_confidence_recomputed": 0.8434122800827026
+        },
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train44",
+          "test_acc_recomputed": 0.9259259259259259,
+          "test_macro_f1_recomputed": 0.9123809523809525,
+          "avg_confidence_recomputed": 0.8479766249656677
+        }
+      ]
+    },
+    {
+      "split_seed": 43,
+      "num_models": 3,
+      "num_test": 27,
+      "ensemble_test_acc": 0.7777777777777778,
+      "ensemble_test_macro_f1": 0.7514285714285714,
+      "ensemble_avg_confidence": 0.5745057463645935,
+      "ensemble_confusion_matrix": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          0,
+          5,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      ],
+      "ensemble_predictions_csv": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/summary/ensemble_test_predictions_split43.csv",
+      "per_model_recomputed": [
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split43_train42",
+          "test_acc_recomputed": 0.7777777777777778,
+          "test_macro_f1_recomputed": 0.7514285714285714,
+          "avg_confidence_recomputed": 0.6061387658119202
+        },
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split43_train43",
+          "test_acc_recomputed": 0.7777777777777778,
+          "test_macro_f1_recomputed": 0.7739194139194139,
+          "avg_confidence_recomputed": 0.604338526725769
+        },
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split43_train44",
+          "test_acc_recomputed": 0.7037037037037037,
+          "test_macro_f1_recomputed": 0.6796336996336997,
+          "avg_confidence_recomputed": 0.518700897693634
+        }
+      ]
+    },
+    {
+      "split_seed": 44,
+      "num_models": 3,
+      "num_test": 27,
+      "ensemble_test_acc": 0.8518518518518519,
+      "ensemble_test_macro_f1": 0.849047619047619,
+      "ensemble_avg_confidence": 0.6076771020889282,
+      "ensemble_confusion_matrix": [
+        [
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          6,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      ],
+      "ensemble_predictions_csv": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/summary/ensemble_test_predictions_split44.csv",
+      "per_model_recomputed": [
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split44_train42",
+          "test_acc_recomputed": 0.8518518518518519,
+          "test_macro_f1_recomputed": 0.849047619047619,
+          "avg_confidence_recomputed": 0.5871312618255615
+        },
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split44_train43",
+          "test_acc_recomputed": 0.8888888888888888,
+          "test_macro_f1_recomputed": 0.8966666666666667,
+          "avg_confidence_recomputed": 0.6060306429862976
+        },
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split44_train44",
+          "test_acc_recomputed": 0.9259259259259259,
+          "test_macro_f1_recomputed": 0.9323809523809523,
+          "avg_confidence_recomputed": 0.633747935295105
+        }
+      ]
+    },
+    {
+      "split_seed": 45,
+      "num_models": 3,
+      "num_test": 27,
+      "ensemble_test_acc": 0.8518518518518519,
+      "ensemble_test_macro_f1": 0.8014285714285714,
+      "ensemble_avg_confidence": 0.7041107416152954,
+      "ensemble_confusion_matrix": [
+        [
+          1,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          2,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          6,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2
+        ]
+      ],
+      "ensemble_predictions_csv": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/summary/ensemble_test_predictions_split45.csv",
+      "per_model_recomputed": [
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split45_train42",
+          "test_acc_recomputed": 0.8518518518518519,
+          "test_macro_f1_recomputed": 0.8014285714285714,
+          "avg_confidence_recomputed": 0.6602303385734558
+        },
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split45_train43",
+          "test_acc_recomputed": 0.8518518518518519,
+          "test_macro_f1_recomputed": 0.8014285714285714,
+          "avg_confidence_recomputed": 0.7794776558876038
+        },
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split45_train44",
+          "test_acc_recomputed": 0.8518518518518519,
+          "test_macro_f1_recomputed": 0.8014285714285714,
+          "avg_confidence_recomputed": 0.6726244688034058
+        }
+      ]
+    },
+    {
+      "split_seed": 46,
+      "num_models": 3,
+      "num_test": 27,
+      "ensemble_test_acc": 1.0,
+      "ensemble_test_macro_f1": 1.0,
+      "ensemble_avg_confidence": 0.8538680672645569,
+      "ensemble_confusion_matrix": [
+        [
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          6,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2
+        ]
+      ],
+      "ensemble_predictions_csv": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/summary/ensemble_test_predictions_split46.csv",
+      "per_model_recomputed": [
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split46_train42",
+          "test_acc_recomputed": 1.0,
+          "test_macro_f1_recomputed": 1.0,
+          "avg_confidence_recomputed": 0.846220850944519
+        },
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split46_train43",
+          "test_acc_recomputed": 1.0,
+          "test_macro_f1_recomputed": 1.0,
+          "avg_confidence_recomputed": 0.8841835856437683
+        },
+        {
+          "run_dir": "/root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split46_train44",
+          "test_acc_recomputed": 1.0,
+          "test_macro_f1_recomputed": 1.0,
+          "avg_confidence_recomputed": 0.8311997652053833
+        }
+      ]
+    }
+  ]
+}

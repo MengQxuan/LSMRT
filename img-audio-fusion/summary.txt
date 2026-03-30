@@ -85,3 +85,277 @@
 out_dir: /root/mqx/LSMRT/img-audio-fusion/runs/fusion_head_split811_seed43
 best_head: /root/mqx/LSMRT/img-audio-fusion/runs/fusion_head_split811_seed43/best_head.pt
 test_acc=0.8065, test_macro_f1=0.7917
+
+九、去除 steel 后训练结果（2026-03-29）
+- 数据处理：
+  - 已从 `data/fusiondata/img`、`data/fusiondata/img_jpg`、`data/fusiondata/audio` 删除 `steel` 类全部样本（各 26，共 78）
+  - 删除清单：`img-audio-fusion/deleted_steel_files_20260329_034537.txt`
+- 新划分与标签目录：`img-audio-fusion/split_fusiondata_no_steel_8_1_1`
+  - paired total: 277
+  - num_classes: 10
+  - train/val/test: 221/28/28
+  - 泄漏检查：train/val/test 样本ID交集均为 0
+- 训练配置：
+  - 训练目录：`img-audio-fusion/runs/fusion_head_no_steel_seed42`
+  - 训练设备：`cuda:0`，`num_gpu=2`，`DataParallel=True`
+  - 融合特征维度：1536（图像1280 + 音频256）
+  - 超参：epochs=150, patience=25, batch=64, lr=1e-3, wd=1e-4, dropout=0.3, hidden_dim=512
+  - 实际早停：epoch 81（best epoch 56）
+  - 总耗时：189.41 秒（约 3.16 分钟）
+- 指标结果：
+  - best_val_acc = 0.8929
+  - best_val_macro_f1 = 0.9150
+  - test_acc = 0.8571
+  - test_macro_f1 = 0.8526
+- 测试集错分（4/28）：
+  - foam -> tile: 1
+  - plastic -> aluminum: 1
+  - rubber -> carton: 1
+  - wood -> foam: 1
+- 关键输出文件：
+  - `img-audio-fusion/runs/fusion_head_no_steel_seed42/best_head.pt`
+  - `img-audio-fusion/runs/fusion_head_no_steel_seed42/metrics.json`
+  - `img-audio-fusion/runs/fusion_head_no_steel_seed42/test_predictions.csv`
+
+十、同步删除 foam35 / plastic51 / plastic52 并重编号 plastic 后复训结果（2026-03-29）
+- 数据变更（同步于 `img/img_jpg/audio` 三模态）：
+  - 删除样本：`foam35`、`plastic51`、`plastic52`
+  - plastic 重命名（保持一一对应）：
+    - plastic53 -> plastic51
+    - plastic54 -> plastic52
+    - plastic55 -> plastic53
+    - plastic56 -> plastic54
+    - plastic57 -> plastic55
+    - plastic58 -> plastic56
+  - 操作清单：
+    - 删除清单：`img-audio-fusion/deleted_sync_samples_20260329_055936.txt`
+    - 重命名映射：`img-audio-fusion/renamed_plastic_mapping_20260329_055936.json`
+- 划分与标签更新：
+  - 目录：`img-audio-fusion/split_fusiondata_no_steel_8_1_1`（已更新）
+  - paired total: 274
+  - num_classes: 10
+  - train/val/test: 220/27/27
+  - 类别计数变化：foam=34，plastic=56
+  - 泄漏检查：train/val/test 样本ID交集均为 0
+- 复训配置与输出：
+  - 训练目录：`img-audio-fusion/runs/fusion_head_no_steel_rm_f35_p51p52_seed42`
+  - 训练设备：`cuda:0`，`num_gpu=2`，`DataParallel=True`
+  - 融合特征维度：1536（图像1280 + 音频256）
+  - 实际早停：epoch 89（best epoch 64）
+  - 总耗时：640.04 秒（约 10.67 分钟）
+- 指标结果：
+  - best_val_acc = 0.8889
+  - best_val_macro_f1 = 0.9093
+  - test_acc = 0.9259
+  - test_macro_f1 = 0.9124
+- 测试集错分（2/27）：
+  - rubber -> paper: 1
+  - wood -> foam: 1
+
+
+
+
+[CMD] /root/miniconda3/envs/lsmrt_py311/bin/python /root/mqx/LSMRT/img-audio-fusion/train_fusion_head.py --split_dir /root/mqx/LSMRT/img-audio-fusion/multi_seed/splits/split_seed42_8_1_1 --image_ckpt /root/mqx/LSMRT/image-branch/runs/effb0_s224_split1_resize/best.pt --audio_ckpt /root/mqx/LSMRT/audio-branch/runs/horizontal_robot_impact_sr24000_clip1.0_b32x2_e50_pretrain_invSqrt_c5/best.pt --out_dir /root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train42 --img_size 224 --target_sr 24000 --clip_sec 1.0 --n_fft 0 --hop_length 0 --n_mels 0 --epochs 150 --batch 64 --lr 0.001 --wd 0.0001 --dropout 0.3 --hidden_dim 512 --label_smoothing 0.05 --patience 25 --num_workers 4 --seed 42 --use_cuda --use_data_parallel
+split_dir: /root/mqx/LSMRT/img-audio-fusion/multi_seed/splits/split_seed42_8_1_1
+train/val/test: 220 27 27
+num_classes: 10
+device: cuda:0 num_gpu: 2 use_data_parallel: True
+[extract:train] batch 4/4
+[extract:val] batch 1/1
+[extract:test] batch 1/1
+feature_dim: 1536
+features train/val/test: 220 27 27
+[001] loss=2.2596 val_acc=0.4444 val_f1=0.3000
+[002] loss=2.1005 val_acc=0.4815 val_f1=0.3383
+[003] loss=1.9241 val_acc=0.4815 val_f1=0.3157
+[004] loss=1.6922 val_acc=0.6296 val_f1=0.5190
+[005] loss=1.5440 val_acc=0.6667 val_f1=0.5555
+[006] loss=1.3566 val_acc=0.7778 val_f1=0.7340
+[007] loss=1.2257 val_acc=0.7407 val_f1=0.7038
+[008] loss=1.0904 val_acc=0.7778 val_f1=0.7293
+[009] loss=0.9594 val_acc=0.7778 val_f1=0.7436
+[010] loss=0.8896 val_acc=0.7778 val_f1=0.7436
+[011] loss=0.8230 val_acc=0.7407 val_f1=0.7003
+[012] loss=0.7371 val_acc=0.7407 val_f1=0.7003
+[013] loss=0.6997 val_acc=0.7407 val_f1=0.7003
+[014] loss=0.6567 val_acc=0.7407 val_f1=0.7003
+[015] loss=0.6311 val_acc=0.7037 val_f1=0.6757
+[016] loss=0.6044 val_acc=0.7037 val_f1=0.6757
+[017] loss=0.5882 val_acc=0.7037 val_f1=0.6757
+[018] loss=0.5717 val_acc=0.7037 val_f1=0.6757
+[019] loss=0.5357 val_acc=0.7407 val_f1=0.7557
+[020] loss=0.5466 val_acc=0.7407 val_f1=0.7557
+[021] loss=0.5062 val_acc=0.7037 val_f1=0.6757
+[022] loss=0.4904 val_acc=0.7778 val_f1=0.8039
+[023] loss=0.4800 val_acc=0.7778 val_f1=0.7990
+[024] loss=0.4618 val_acc=0.7778 val_f1=0.7990
+[025] loss=0.4636 val_acc=0.7778 val_f1=0.7990
+[026] loss=0.4608 val_acc=0.7407 val_f1=0.7606
+[027] loss=0.4485 val_acc=0.7407 val_f1=0.7606
+[028] loss=0.4262 val_acc=0.7778 val_f1=0.8039
+[029] loss=0.4185 val_acc=0.7778 val_f1=0.7990
+[030] loss=0.4269 val_acc=0.7778 val_f1=0.8039
+[031] loss=0.4090 val_acc=0.8148 val_f1=0.8439
+[032] loss=0.4091 val_acc=0.8148 val_f1=0.8439
+[033] loss=0.3993 val_acc=0.7778 val_f1=0.8039
+[034] loss=0.4036 val_acc=0.7778 val_f1=0.8039
+[035] loss=0.3960 val_acc=0.7778 val_f1=0.8039
+[036] loss=0.3935 val_acc=0.8148 val_f1=0.8439
+[037] loss=0.3788 val_acc=0.8148 val_f1=0.8439
+[038] loss=0.3828 val_acc=0.8148 val_f1=0.8439
+[039] loss=0.3845 val_acc=0.8148 val_f1=0.8439
+[040] loss=0.3791 val_acc=0.8148 val_f1=0.8439
+[041] loss=0.3695 val_acc=0.8148 val_f1=0.8439
+[042] loss=0.3693 val_acc=0.8519 val_f1=0.8705
+[043] loss=0.3664 val_acc=0.8519 val_f1=0.8705
+[044] loss=0.3637 val_acc=0.8519 val_f1=0.8705
+[045] loss=0.3624 val_acc=0.8519 val_f1=0.8705
+[046] loss=0.3652 val_acc=0.8519 val_f1=0.8705
+[047] loss=0.3619 val_acc=0.8519 val_f1=0.8705
+[048] loss=0.3557 val_acc=0.8519 val_f1=0.8705
+[049] loss=0.3536 val_acc=0.8519 val_f1=0.8705
+[050] loss=0.3542 val_acc=0.8519 val_f1=0.8705
+[051] loss=0.3545 val_acc=0.8519 val_f1=0.8705
+[052] loss=0.3473 val_acc=0.8519 val_f1=0.8705
+[053] loss=0.3521 val_acc=0.8519 val_f1=0.8705
+[054] loss=0.3499 val_acc=0.8519 val_f1=0.8705
+[055] loss=0.3484 val_acc=0.8519 val_f1=0.8705
+[056] loss=0.3399 val_acc=0.8519 val_f1=0.8705
+[057] loss=0.3411 val_acc=0.8519 val_f1=0.8705
+[058] loss=0.3350 val_acc=0.8519 val_f1=0.8705
+[059] loss=0.3363 val_acc=0.8519 val_f1=0.8705
+[060] loss=0.3400 val_acc=0.8519 val_f1=0.8705
+[061] loss=0.3380 val_acc=0.8519 val_f1=0.8705
+[062] loss=0.3379 val_acc=0.8519 val_f1=0.8705
+[063] loss=0.3316 val_acc=0.8519 val_f1=0.8705
+[064] loss=0.3325 val_acc=0.8889 val_f1=0.9093
+[065] loss=0.3377 val_acc=0.8889 val_f1=0.9093
+[066] loss=0.3296 val_acc=0.8519 val_f1=0.8705
+[067] loss=0.3340 val_acc=0.8519 val_f1=0.8705
+[068] loss=0.3282 val_acc=0.8889 val_f1=0.9093
+[069] loss=0.3257 val_acc=0.8889 val_f1=0.9093
+[070] loss=0.3286 val_acc=0.8889 val_f1=0.9093
+[071] loss=0.3257 val_acc=0.8519 val_f1=0.8705
+[072] loss=0.3235 val_acc=0.8519 val_f1=0.8705
+[073] loss=0.3227 val_acc=0.8889 val_f1=0.9093
+[074] loss=0.3255 val_acc=0.8889 val_f1=0.9093
+[075] loss=0.3221 val_acc=0.8889 val_f1=0.9093
+[076] loss=0.3208 val_acc=0.8889 val_f1=0.9093
+[077] loss=0.3221 val_acc=0.8889 val_f1=0.9093
+[078] loss=0.3205 val_acc=0.8889 val_f1=0.9093
+[079] loss=0.3194 val_acc=0.8889 val_f1=0.9093
+[080] loss=0.3199 val_acc=0.8889 val_f1=0.9093
+[081] loss=0.3172 val_acc=0.8889 val_f1=0.9093
+[082] loss=0.3185 val_acc=0.8889 val_f1=0.9093
+[083] loss=0.3163 val_acc=0.8889 val_f1=0.9093
+[084] loss=0.3166 val_acc=0.8889 val_f1=0.9093
+[085] loss=0.3156 val_acc=0.8889 val_f1=0.9093
+[086] loss=0.3190 val_acc=0.8889 val_f1=0.9093
+[087] loss=0.3155 val_acc=0.8889 val_f1=0.9093
+[088] loss=0.3136 val_acc=0.8889 val_f1=0.9093
+[089] loss=0.3143 val_acc=0.8889 val_f1=0.9093
+Early stop at epoch 89, best epoch=64
+=== DONE ===
+out_dir: /root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train42
+best_head: /root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train42/best_head.pt
+test_acc=0.9259, test_macro_f1=0.9124
+
+
+[001] loss=2.2617 val_acc=0.3704 val_f1=0.1928
+[002] loss=2.0842 val_acc=0.4074 val_f1=0.2328
+[003] loss=1.9100 val_acc=0.4074 val_f1=0.2280
+[004] loss=1.7430 val_acc=0.5926 val_f1=0.4971
+[005] loss=1.5832 val_acc=0.6667 val_f1=0.6038
+[006] loss=1.3944 val_acc=0.7037 val_f1=0.6767
+[007] loss=1.2491 val_acc=0.7407 val_f1=0.7038
+[008] loss=1.1257 val_acc=0.7778 val_f1=0.7293
+[009] loss=1.0146 val_acc=0.7037 val_f1=0.6469
+[010] loss=0.9268 val_acc=0.7778 val_f1=0.7436
+[011] loss=0.8455 val_acc=0.7037 val_f1=0.6536
+[012] loss=0.7693 val_acc=0.7407 val_f1=0.7003
+[013] loss=0.7125 val_acc=0.7407 val_f1=0.7003
+[014] loss=0.6559 val_acc=0.7407 val_f1=0.7003
+[015] loss=0.6264 val_acc=0.7407 val_f1=0.7557
+[016] loss=0.6194 val_acc=0.7778 val_f1=0.7990
+[017] loss=0.5801 val_acc=0.7778 val_f1=0.7990
+[018] loss=0.5543 val_acc=0.7778 val_f1=0.7990
+[019] loss=0.5322 val_acc=0.7778 val_f1=0.7990
+[020] loss=0.5185 val_acc=0.7778 val_f1=0.7990
+[021] loss=0.5135 val_acc=0.7407 val_f1=0.7557
+[022] loss=0.4780 val_acc=0.7407 val_f1=0.7557
+[023] loss=0.4705 val_acc=0.7407 val_f1=0.7557
+[024] loss=0.4585 val_acc=0.7778 val_f1=0.7990
+[025] loss=0.4504 val_acc=0.7778 val_f1=0.8039
+[026] loss=0.4510 val_acc=0.7778 val_f1=0.7990
+[027] loss=0.4502 val_acc=0.7778 val_f1=0.7990
+[028] loss=0.4389 val_acc=0.7778 val_f1=0.8039
+[029] loss=0.4275 val_acc=0.7778 val_f1=0.8039
+[030] loss=0.4272 val_acc=0.7778 val_f1=0.8039
+[031] loss=0.4084 val_acc=0.7778 val_f1=0.8039
+[032] loss=0.4087 val_acc=0.7778 val_f1=0.8039
+[033] loss=0.4039 val_acc=0.7778 val_f1=0.8039
+[034] loss=0.4040 val_acc=0.7778 val_f1=0.8039
+[035] loss=0.3934 val_acc=0.7778 val_f1=0.8039
+[036] loss=0.3905 val_acc=0.7778 val_f1=0.8039
+[037] loss=0.3802 val_acc=0.7778 val_f1=0.8039
+[038] loss=0.3953 val_acc=0.8148 val_f1=0.8305
+[039] loss=0.3801 val_acc=0.7778 val_f1=0.8039
+[040] loss=0.3825 val_acc=0.7778 val_f1=0.8039
+[041] loss=0.3710 val_acc=0.8148 val_f1=0.8305
+[042] loss=0.3741 val_acc=0.8148 val_f1=0.8305
+[043] loss=0.3753 val_acc=0.8148 val_f1=0.8305
+[044] loss=0.3645 val_acc=0.8148 val_f1=0.8305
+[045] loss=0.3658 val_acc=0.7778 val_f1=0.8039
+[046] loss=0.3593 val_acc=0.8148 val_f1=0.8305
+[047] loss=0.3571 val_acc=0.8148 val_f1=0.8305
+[048] loss=0.3623 val_acc=0.8148 val_f1=0.8305
+[049] loss=0.3525 val_acc=0.8148 val_f1=0.8305
+[050] loss=0.3532 val_acc=0.8148 val_f1=0.8305
+[051] loss=0.3468 val_acc=0.8148 val_f1=0.8305
+[052] loss=0.3485 val_acc=0.8148 val_f1=0.8305
+[053] loss=0.3447 val_acc=0.8519 val_f1=0.8705
+[054] loss=0.3489 val_acc=0.8519 val_f1=0.8705
+[055] loss=0.3453 val_acc=0.8519 val_f1=0.8705
+[056] loss=0.3443 val_acc=0.8519 val_f1=0.8705
+[057] loss=0.3437 val_acc=0.8519 val_f1=0.8705
+[058] loss=0.3390 val_acc=0.8519 val_f1=0.8705
+[059] loss=0.3378 val_acc=0.8519 val_f1=0.8705
+[060] loss=0.3361 val_acc=0.8519 val_f1=0.8705
+[061] loss=0.3383 val_acc=0.8519 val_f1=0.8705
+[062] loss=0.3333 val_acc=0.8519 val_f1=0.8705
+[063] loss=0.3348 val_acc=0.8519 val_f1=0.8705
+[064] loss=0.3353 val_acc=0.8519 val_f1=0.8705
+[065] loss=0.3318 val_acc=0.8519 val_f1=0.8705
+[066] loss=0.3323 val_acc=0.8519 val_f1=0.8705
+[067] loss=0.3307 val_acc=0.8519 val_f1=0.8705
+[068] loss=0.3302 val_acc=0.8889 val_f1=0.9093
+[069] loss=0.3311 val_acc=0.8889 val_f1=0.9093
+[070] loss=0.3305 val_acc=0.8889 val_f1=0.9093
+[071] loss=0.3287 val_acc=0.8889 val_f1=0.9093
+[072] loss=0.3286 val_acc=0.8889 val_f1=0.9093
+[073] loss=0.3265 val_acc=0.8889 val_f1=0.9093
+[074] loss=0.3252 val_acc=0.8889 val_f1=0.9093
+[075] loss=0.3226 val_acc=0.8889 val_f1=0.9093
+[076] loss=0.3228 val_acc=0.8889 val_f1=0.9093
+[077] loss=0.3214 val_acc=0.8889 val_f1=0.9093
+[078] loss=0.3221 val_acc=0.8889 val_f1=0.9093
+[079] loss=0.3209 val_acc=0.8889 val_f1=0.9093
+[080] loss=0.3242 val_acc=0.8889 val_f1=0.9093
+[081] loss=0.3205 val_acc=0.8889 val_f1=0.9093
+[082] loss=0.3195 val_acc=0.8889 val_f1=0.9093
+[083] loss=0.3200 val_acc=0.8889 val_f1=0.9093
+[084] loss=0.3168 val_acc=0.8889 val_f1=0.9093
+[085] loss=0.3171 val_acc=0.8889 val_f1=0.9093
+[086] loss=0.3164 val_acc=0.8889 val_f1=0.9093
+[087] loss=0.3176 val_acc=0.8889 val_f1=0.9093
+[088] loss=0.3162 val_acc=0.8889 val_f1=0.9093
+[089] loss=0.3135 val_acc=0.8889 val_f1=0.9093
+[090] loss=0.3147 val_acc=0.8889 val_f1=0.9093
+[091] loss=0.3137 val_acc=0.8889 val_f1=0.9093
+[092] loss=0.3134 val_acc=0.8889 val_f1=0.9093
+[093] loss=0.3110 val_acc=0.8889 val_f1=0.9093
+Early stop at epoch 93, best epoch=68
+=== DONE ===
+out_dir: /root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train44
+best_head: /root/mqx/LSMRT/img-audio-fusion/multi_seed/runs/split42_train44/best_head.pt
+test_acc=0.9259, test_macro_f1=0.9124

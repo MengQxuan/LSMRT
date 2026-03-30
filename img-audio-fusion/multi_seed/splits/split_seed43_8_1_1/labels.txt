@@ -1,0 +1,10 @@
+aluminum
+carton
+foam
+glass
+paper
+plastic
+rubber
+tile
+wood
+woodgrain

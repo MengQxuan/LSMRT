@@ -6,6 +6,7 @@ imu-branch/runs/
 audio-branch/runs/
 runs/
 img-audio-fusion/runs/
+img-audio-fusion/multi_seed/runs/
 # model / archives
 *.zip
 *.pth

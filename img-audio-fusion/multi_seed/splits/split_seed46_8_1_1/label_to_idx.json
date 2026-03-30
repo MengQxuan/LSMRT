@@ -1,0 +1,12 @@
+{
+  "aluminum": 0,
+  "carton": 1,
+  "foam": 2,
+  "glass": 3,
+  "paper": 4,
+  "plastic": 5,
+  "rubber": 6,
+  "tile": 7,
+  "wood": 8,
+  "woodgrain": 9
+}

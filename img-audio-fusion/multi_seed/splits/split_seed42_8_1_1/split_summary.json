@@ -1,0 +1,32 @@
+{
+  "img_dir": "/root/mqx/LSMRT/data/fusiondata/img",
+  "audio_dir": "/root/mqx/LSMRT/data/fusiondata/audio",
+  "img_runtime_dir": "/root/mqx/LSMRT/data/fusiondata/img_jpg",
+  "num_img_samples": 274,
+  "num_audio_samples": 274,
+  "num_paired_samples": 274,
+  "num_only_img": 0,
+  "num_only_audio": 0,
+  "num_train": 220,
+  "num_val": 27,
+  "num_test": 27,
+  "num_classes": 10,
+  "ratios_target": {
+    "train": 0.8,
+    "val": 0.1,
+    "test": 0.1
+  },
+  "seed": 42,
+  "class_distribution": {
+    "aluminum": 25,
+    "carton": 23,
+    "foam": 34,
+    "glass": 30,
+    "paper": 18,
+    "plastic": 56,
+    "rubber": 20,
+    "tile": 22,
+    "wood": 30,
+    "woodgrain": 16
+  }
+}
